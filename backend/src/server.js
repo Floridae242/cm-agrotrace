@@ -1,3 +1,4 @@
+// backend/src/server.js
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -8,12 +9,6 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import QRCode from "qrcode";
 import { PrismaClient } from "@prisma/client";
-import lotsRouter from './routes/lots.js'
-
-// ...
-app.use(express.json())
-// (มี CORS แล้วก็ดี)
-app.use('/api/lots', lotsRouter)   // <= ผูกเส้นทางตรงนี้
 
 dotenv.config();
 
@@ -21,16 +16,17 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
-const FRONTEND_PUBLIC_BASE = process.env.FRONTEND_PUBLIC_BASE || "http://localhost:5173";
+const FRONTEND_PUBLIC_BASE =
+  process.env.FRONTEND_PUBLIC_BASE || "http://localhost:5173";
 
+// ---- middleware ----
 app.use(helmet());
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "2mb" }));
 app.use(morgan("dev"));
 
-// --- helpers ---
+// ---- helpers ----
 function computeLotHash(l) {
-  // create a canonical string from selected fields to verify tamper evidence
   const obj = {
     lotId: l.lotId,
     cropType: l.cropType,
@@ -42,14 +38,18 @@ function computeLotHash(l) {
     brix: l.brix ?? null,
     moisture: l.moisture ?? null,
     pesticidePass: l.pesticidePass ?? null,
-    ownerId: l.ownerId
+    ownerId: l.ownerId,
   };
   const json = JSON.stringify(obj, Object.keys(obj).sort());
   return crypto.createHash("sha256").update(json).digest("hex");
 }
 
 function signToken(user) {
-  return jwt.sign({ uid: user.id, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign(
+    { uid: user.id, role: user.role, name: user.name },
+    JWT_SECRET,
+    { expiresIn: "7d" }
+  );
 }
 
 async function auth(req, res, next) {
@@ -65,7 +65,7 @@ async function auth(req, res, next) {
   }
 }
 
-// --- routes ---
+// ---- routes ----
 
 // Health
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
@@ -74,11 +74,17 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { email, password, name, role } = req.body;
-    if (!email || !password || !name) return res.status(400).json({ error: "missing fields" });
+    if (!email || !password || !name)
+      return res.status(400).json({ error: "missing fields" });
     const hash = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({ data: { email, password: hash, name, role: role || "FARMER" } });
+    const user = await prisma.user.create({
+      data: { email, password: hash, name, role: role || "FARMER" },
+    });
     const token = signToken(user);
-    res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+    res.json({
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    });
   } catch (e) {
     console.error(e);
     res.status(400).json({ error: "registration failed", detail: e.message });
@@ -92,7 +98,10 @@ app.post("/api/auth/login", async (req, res) => {
   const ok = await bcrypt.compare(password, user.password);
   if (!ok) return res.status(401).json({ error: "invalid credentials" });
   const token = signToken(user);
-  res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+  res.json({
+    token,
+    user: { id: user.id, email: user.email, name: user.name, role: user.role },
+  });
 });
 
 app.get("/api/me", auth, async (req, res) => {
@@ -100,7 +109,7 @@ app.get("/api/me", auth, async (req, res) => {
   res.json({ id: u.id, email: u.email, name: u.name, role: u.role });
 });
 
-// Lots
+// ---- Lots (protected) ----
 app.post("/api/lots", auth, async (req, res) => {
   try {
     const {
@@ -114,12 +123,18 @@ app.post("/api/lots", auth, async (req, res) => {
       brix,
       moisture,
       pesticidePass,
-      notes
+      notes,
     } = req.body;
 
-    if (!cropType || !harvestDate) return res.status(400).json({ error: "cropType and harvestDate are required" });
+    if (!cropType || !harvestDate)
+      return res
+        .status(400)
+        .json({ error: "cropType and harvestDate are required" });
 
-    const generatedLotId = lotId && lotId.trim().length ? lotId.trim() : `LOT-${Date.now().toString(36).toUpperCase()}`;
+    const generatedLotId =
+      lotId && lotId.trim().length
+        ? lotId.trim()
+        : `LOT-${Date.now().toString(36).toUpperCase()}`;
 
     const lotDraft = {
       lotId: generatedLotId,
@@ -131,25 +146,31 @@ app.post("/api/lots", auth, async (req, res) => {
       harvestDate: new Date(harvestDate),
       brix: brix ?? null,
       moisture: moisture ?? null,
-      pesticidePass: typeof pesticidePass === "boolean" ? pesticidePass : null,
+      pesticidePass:
+        typeof pesticidePass === "boolean" ? pesticidePass : null,
       notes: notes || "",
       ownerId: req.user.uid,
-      hash: "" // fill after create
+      hash: "",
     };
 
-    const hash = computeLotHash(lotDraft);
-    lotDraft.hash = hash;
+    lotDraft.hash = computeLotHash(lotDraft);
 
     const lot = await prisma.lot.create({ data: lotDraft });
 
-    // initial event
     await prisma.event.create({
       data: {
         lotId: lot.id,
         type: "HARVEST_CREATED",
-        locationName: district ? `${district}, ${province || ""}`.trim() : (province || ""),
-        note: "สร้างล็อตผลผลิต"
-      }
+        timestamp: new Date(),
+        locationName: district
+          ? `${district}, ${province || ""}`.trim()
+          : province || "",
+        fromName: null,
+        toName: null,
+        temperature: null,
+        humidity: null,
+        note: "สร้างล็อตผลผลิต",
+      },
     });
 
     res.json(lot);
@@ -162,25 +183,45 @@ app.post("/api/lots", auth, async (req, res) => {
 app.get("/api/lots", auth, async (req, res) => {
   const role = req.user.role;
   const where = role === "ADMIN" ? {} : { ownerId: req.user.uid };
-  const lots = await prisma.lot.findMany({ where, orderBy: { createdAt: "desc" } });
+  const lots = await prisma.lot.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+  });
   res.json(lots);
 });
 
 app.get("/api/lots/:lotId", auth, async (req, res) => {
   const lotIdParam = req.params.lotId;
-  const lot = await prisma.lot.findFirst({ where: { lotId: lotIdParam }, include: { events: { orderBy: { timestamp: "asc" } } } });
+  const lot = await prisma.lot.findFirst({
+    where: { lotId: lotIdParam },
+    include: { events: { orderBy: { timestamp: "asc" } } },
+  });
   if (!lot) return res.status(404).json({ error: "not found" });
-  if (req.user.role !== "ADMIN" && lot.ownerId !== req.user.uid) return res.status(403).json({ error: "forbidden" });
+  if (req.user.role !== "ADMIN" && lot.ownerId !== req.user.uid)
+    return res.status(403).json({ error: "forbidden" });
   res.json(lot);
 });
 
 app.post("/api/lots/:lotId/events", auth, async (req, res) => {
   try {
-    const lot = await prisma.lot.findFirst({ where: { lotId: req.params.lotId } });
+    const lot = await prisma.lot.findFirst({
+      where: { lotId: req.params.lotId },
+    });
     if (!lot) return res.status(404).json({ error: "lot not found" });
-    if (req.user.role !== "ADMIN" && lot.ownerId !== req.user.uid) return res.status(403).json({ error: "forbidden" });
+    if (req.user.role !== "ADMIN" && lot.ownerId !== req.user.uid)
+      return res.status(403).json({ error: "forbidden" });
 
-    const { type, locationName, fromName, toName, temperature, humidity, note, timestamp } = req.body;
+    const {
+      type,
+      locationName,
+      fromName,
+      toName,
+      temperature,
+      humidity,
+      note,
+      timestamp,
+    } = req.body;
+
     const event = await prisma.event.create({
       data: {
         lotId: lot.id,
@@ -191,8 +232,8 @@ app.post("/api/lots/:lotId/events", auth, async (req, res) => {
         temperature: typeof temperature === "number" ? temperature : null,
         humidity: typeof humidity === "number" ? humidity : null,
         note: note || null,
-        timestamp: timestamp ? new Date(timestamp) : undefined
-      }
+        timestamp: timestamp ? new Date(timestamp) : undefined,
+      },
     });
     res.json(event);
   } catch (e) {
@@ -201,24 +242,44 @@ app.post("/api/lots/:lotId/events", auth, async (req, res) => {
   }
 });
 
-// Public (no auth)
-app.get("/api/lots/public/:lotId", async (req, res) => {
-  const lot = await prisma.lot.findFirst({ where: { lotId: req.params.lotId }, include: { events: { orderBy: { timestamp: "asc" } } } });
-  if (!lot) return res.status(404).json({ error: "not found" });
-  // redact ownerId
-  const { ownerId, ...rest } = lot;
-  res.json(rest);
+// ---- Lots (public) ----
+// ✅ คืน { lot, events } ให้ตรงกับ frontend และรองรับทั้ง lotId/id + case-insensitive
+app.get("/api/lots/public/:key", async (req, res) => {
+  try {
+    const raw = req.params.key ?? "";
+    const key = raw.trim();
+    const lot = await prisma.lot.findFirst({
+      where: {
+        OR: [
+          { lotId: { equals: key, mode: "insensitive" } },
+          { id: key },
+        ],
+      },
+    });
+    if (!lot) return res.status(404).json({ error: "not found" });
+
+    const events = await prisma.event.findMany({
+      where: { lotId: lot.id },
+      orderBy: { timestamp: "asc" },
+    });
+
+    res.json({ lot, events });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "SERVER_ERROR" });
+  }
 });
 
 // QR for a given lotId -> points to frontend public route
 app.get("/api/lots/:lotId/qr", async (req, res) => {
-  const url = `${FRONTEND_PUBLIC_BASE}/scan/${encodeURIComponent(req.params.lotId)}`;
+  const url = `${FRONTEND_PUBLIC_BASE}/scan/${encodeURIComponent(
+    req.params.lotId
+  )}`;
   res.setHeader("Content-Type", "image/png");
   QRCode.toFileStream(res, url, { margin: 1, width: 256 });
 });
 
-// Start
+// ---- start ----
 app.listen(PORT, () => {
   console.log(`CM-AgroTrace backend listening on :${PORT}`);
 });
-
