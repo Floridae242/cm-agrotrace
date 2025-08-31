@@ -1,4 +1,3 @@
-// backend/src/routes/lots.js
 import express from "express";
 import { PrismaClient } from "@prisma/client";
 import auth from "../utils/auth.js"; // middleware ตรวจ JWT
@@ -21,10 +20,15 @@ router.get("/", auth, async (req, res) => {
 });
 
 /** GET (public): ข้อมูลล็อต + events ใช้สำหรับสแกน */
-router.get("/public/:lotId", async (req, res) => {
+router.get("/public/:key", async (req, res) => {
   try {
-    const lot = await prisma.lot.findUnique({
-      where: { lotId: req.params.lotId },
+    const key = req.params.key;
+
+    // ✅ รองรับทั้ง lotId และ id
+    const lot = await prisma.lot.findFirst({
+      where: {
+        OR: [{ lotId: key }, { id: key }],
+      },
     });
     if (!lot) return res.status(404).json({ error: "LOT_NOT_FOUND" });
 
@@ -41,10 +45,13 @@ router.get("/public/:lotId", async (req, res) => {
 });
 
 /** GET QR PNG ของล็อต */
-router.get("/:lotId/qr", async (req, res) => {
+router.get("/:key/qr", async (req, res) => {
   try {
-    const lot = await prisma.lot.findUnique({
-      where: { lotId: req.params.lotId },
+    const key = req.params.key;
+    const lot = await prisma.lot.findFirst({
+      where: {
+        OR: [{ lotId: key }, { id: key }],
+      },
     });
     if (!lot) return res.status(404).send("NOT_FOUND");
 
@@ -101,10 +108,13 @@ router.post("/", auth, async (req, res) => {
 });
 
 /** POST: เพิ่ม event ให้ล็อต */
-router.post("/:lotId/events", auth, async (req, res) => {
+router.post("/:key/events", auth, async (req, res) => {
   try {
-    const lot = await prisma.lot.findUnique({
-      where: { lotId: req.params.lotId },
+    const key = req.params.key;
+    const lot = await prisma.lot.findFirst({
+      where: {
+        OR: [{ lotId: key }, { id: key }],
+      },
       select: { id: true, ownerId: true },
     });
     if (!lot) return res.status(404).json({ error: "LOT_NOT_FOUND" });
@@ -134,10 +144,13 @@ router.post("/:lotId/events", auth, async (req, res) => {
 });
 
 /** DELETE: ลบล็อต */
-router.delete("/:lotId", auth, async (req, res) => {
+router.delete("/:key", auth, async (req, res) => {
   try {
-    const lot = await prisma.lot.findUnique({
-      where: { lotId: req.params.lotId },
+    const key = req.params.key;
+    const lot = await prisma.lot.findFirst({
+      where: {
+        OR: [{ lotId: key }, { id: key }],
+      },
       select: { id: true, ownerId: true },
     });
     if (!lot) return res.status(404).json({ error: "LOT_NOT_FOUND" });
@@ -146,7 +159,6 @@ router.delete("/:lotId", auth, async (req, res) => {
       return res.status(403).json({ error: "FORBIDDEN" });
     }
 
-    // ลบ event ก่อน (ถ้า schema ไม่ได้ cascade)
     await prisma.event.deleteMany({ where: { lotId: lot.id } });
     await prisma.lot.delete({ where: { id: lot.id } });
 
