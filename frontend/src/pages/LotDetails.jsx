@@ -1,120 +1,84 @@
-// frontend/src/pages/LotDetails.jsx
-import React from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import api, { API_BASE } from '../utils/api.js'
+import React from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import api, { API_BASE } from "../utils/api.js";
 
 export default function LotDetails() {
-  const nav = useNavigate()
-  const { lotId } = useParams()
-  const [me, setMe] = React.useState(null)
-  const [lot, setLot] = React.useState(null)
-  const [events, setEvents] = React.useState([])
-  const [loading, setLoading] = React.useState(true)
-  const [deleting, setDeleting] = React.useState(false)
-  const [err, setErr] = React.useState('')
+  const nav = useNavigate();
+  const { lotId } = useParams();
+  const [me, setMe] = React.useState(null);
+  const [lot, setLot] = React.useState(null);
+  const [events, setEvents] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [deleting, setDeleting] = React.useState(false);
+  const [err, setErr] = React.useState("");
 
   React.useEffect(() => {
     (async () => {
-      setLoading(true)
-      setErr('')
-
+      setLoading(true);
+      setErr("");
       try {
-        // 1) เช็ค session
-        const user = await api.me()
-        setMe(user || null)
-
-        // 2) ดึงข้อมูล public (รองรับทั้ง 2 รูปแบบ response)
-        const respPublic = await api.get(`/lots/public/${encodeURIComponent(lotId)}`)
-        const lotFromWrapper = respPublic?.lot
-        const eventsFromWrapper = respPublic?.events
-        const lotFromInline = respPublic && !respPublic.lot ? respPublic : null
-
-        // lot: ถ้า backend ส่ง {lot, events} -> ใช้ lot; ถ้าส่ง lot เดี่ยว -> ใช้ respPublic
-        const lotPublic = lotFromWrapper || lotFromInline || null
-        let eventsPublic = Array.isArray(eventsFromWrapper)
-          ? eventsFromWrapper
-          : (Array.isArray(lotPublic?.events) ? lotPublic.events : [])
-
-        // 3) ถ้าล็อกอินอยู่ ลองเรียก protected lot เพื่อ “เติม ownerId” (กรณี public route hide ownerId)
-        let lotWithOwner = lotPublic
-        if (user && lotPublic?.lotId) {
-          try {
-            const privateLot = await api.get(`/lots/${encodeURIComponent(lotPublic.lotId)}`)
-            // merge ownerId และ field ที่อาจขาด
-            lotWithOwner = { ...lotPublic, ownerId: privateLot?.ownerId ?? lotPublic?.ownerId }
-            // ถ้า public ไม่มี events แต่ private มี ก็ใช้ของ private
-            if ((!eventsPublic || eventsPublic.length === 0) && Array.isArray(privateLot?.events)) {
-              eventsPublic = privateLot.events
-            }
-          } catch (e) {
-            // ถ้าเรียก protected ไม่ได้ (เช่น token ไม่พอ) ก็ข้ามไป ใช้ public ต่อ
-          }
-        }
-
-        setLot(lotWithOwner || null)
-        setEvents(Array.isArray(eventsPublic) ? eventsPublic : [])
+        const user = await api.me();
+        setMe(user);
+        const resp = await api.get(
+          `/lots/public/${encodeURIComponent(lotId)}`
+        );
+        setLot(resp.lot || null);
+        setEvents(resp.events || []);
       } catch (e) {
-        console.error('โหลดล็อตล้มเหลว', e)
-        setErr('ไม่พบล็อตนี้หรือเกิดข้อผิดพลาด')
+        console.error("โหลดล็อตล้มเหลว", e);
+        setErr("ไม่พบล็อตนี้หรือเกิดข้อผิดพลาด");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    })()
-  }, [lotId])
+    })();
+  }, [lotId]);
 
-  // เงื่อนไขลบ: ADMIN หรือเป็นเจ้าของ (ต้องมี ownerId ถึงจะเช็คได้)
   const canDelete = React.useMemo(() => {
-    if (!me || !lot) return false
-    if (me.role === 'ADMIN') return true
-    if (!lot.ownerId) return false
-    return me.id === lot.ownerId
-  }, [me, lot])
+    if (!me || !lot) return false;
+    return me.role === "ADMIN" || me.id === lot.ownerId;
+  }, [me, lot]);
 
   async function handleDelete() {
-    if (!canDelete) return
-    if (!confirm(`ยืนยันการลบล็อต: ${lotId} ?`)) return
+    if (!canDelete) return;
+    if (!confirm(`ยืนยันการลบล็อต: ${lotId} ?`)) return;
     try {
-      setDeleting(true)
-      await api.del(`/lots/${encodeURIComponent(lotId)}`)
-      alert('ลบล็อตสำเร็จ')
-      nav('/dashboard')
+      setDeleting(true);
+      await api.del(`/lots/${encodeURIComponent(lotId)}`);
+      alert("ลบล็อตสำเร็จ");
+      nav("/dashboard");
     } catch (e) {
-      console.error('ลบไม่สำเร็จ', e)
-      alert('ลบไม่สำเร็จ')
+      console.error("ลบไม่สำเร็จ", e);
+      alert("ลบไม่สำเร็จ");
     } finally {
-      setDeleting(false)
+      setDeleting(false);
     }
   }
 
-  if (loading) return <div className="p-6">กำลังโหลด...</div>
-  if (err) return <div className="p-6 text-red-600">{err}</div>
-  if (!lot) return <div className="p-6 text-gray-500">ไม่มีข้อมูลล็อต</div>
+  if (loading) return <div className="p-6">กำลังโหลด...</div>;
+  if (err) return <div className="p-6 text-red-600">{err}</div>;
+  if (!lot) return <div className="p-6 text-gray-500">ไม่มีข้อมูลล็อต</div>;
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-start justify-between">
         <h1 className="text-2xl font-semibold">{lot.lotId}</h1>
-
-        <div className="flex items-center gap-3">
-          {canDelete && (
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
-              title="ลบล็อตนี้"
-            >
-              {deleting ? 'กำลังลบ...' : 'ลบล็อต'}
-            </button>
-          )}
-        </div>
+        {canDelete && (
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+            title="ลบล็อตนี้"
+          >
+            {deleting ? "กำลังลบ..." : "ลบล็อต"}
+          </button>
+        )}
       </div>
 
-      {/* กล่องข้อมูลหลัก */}
       <div className="grid md:grid-cols-4 gap-4">
         <div className="md:col-span-3 p-4 bg-white rounded-2xl shadow">
           <div className="text-gray-800">
             <div className="font-medium">
-              {lot.cropType} · {lot.variety || '-'}
+              {lot.cropType} · {lot.variety || "-"}
             </div>
             <div className="text-sm text-gray-500">
               {lot.farmName} · {lot.district} {lot.province}
@@ -124,13 +88,17 @@ export default function LotDetails() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
             <Info
               label="เก็บเกี่ยว"
-              value={lot.harvestDate ? new Date(lot.harvestDate).toLocaleDateString('th-TH') : '-'}
+              value={
+                lot.harvestDate
+                  ? new Date(lot.harvestDate).toLocaleDateString("th-TH")
+                  : "-"
+              }
             />
-            <Info label="Brix" value={lot.brix ?? '-'} />
-            <Info label="ความชื้น" value={lot.moisture ? `${lot.moisture}%` : '-'} />
+            <Info label="Brix" value={lot.brix ?? "-"} />
+            <Info label="ความชื้น" value={lot.moisture ? `${lot.moisture}%` : "-"} />
             <Info
               label="สารตกค้าง"
-              value={lot.pesticidePass ? 'ผ่าน' : 'ไม่ผ่าน'}
+              value={lot.pesticidePass ? "ผ่าน" : "ไม่ผ่าน"}
               positive={lot.pesticidePass}
             />
           </div>
@@ -140,7 +108,6 @@ export default function LotDetails() {
           </div>
         </div>
 
-        {/* QR */}
         <div className="p-4 bg-white rounded-2xl shadow flex items-center justify-center">
           <img
             src={`${API_BASE}/api/lots/${encodeURIComponent(lot.lotId)}/qr`}
@@ -150,7 +117,6 @@ export default function LotDetails() {
         </div>
       </div>
 
-      {/* Timeline */}
       <div className="p-4 bg-white rounded-2xl shadow">
         <h2 className="font-semibold mb-3">ไทม์ไลน์</h2>
         {events.length === 0 ? (
@@ -158,33 +124,32 @@ export default function LotDetails() {
         ) : (
           <ul className="space-y-3">
             {events.map((e) => {
-              // รองรับทั้ง timestamp / createdAt / created_at
-              const ts = e.timestamp || e.createdAt || e.created_at
+              const ts = e.createdAt || e.timestamp; // ✅ รองรับทั้งสองชื่อฟิลด์
               return (
                 <li key={e.id} className="p-3 rounded-xl bg-gray-50">
                   <div className="text-sm font-mono">{e.type}</div>
                   <div className="text-sm text-gray-600">{e.locationName}</div>
-                  {e.note && <div className="text-sm text-gray-500">หมายเหตุ: {e.note}</div>}
-                  {ts && (
-                    <div className="text-xs text-gray-400">
-                      {new Date(ts).toLocaleString('th-TH')}
-                    </div>
+                  {e.note && (
+                    <div className="text-sm text-gray-500">หมายเหตุ: {e.note}</div>
                   )}
+                  <div className="text-xs text-gray-400">
+                    {ts ? new Date(ts).toLocaleString("th-TH") : "-"}
+                  </div>
                 </li>
-              )
+              );
             })}
           </ul>
         )}
       </div>
     </div>
-  )
+  );
 }
 
 function Info({ label, value, positive }) {
   return (
     <div className="p-3 rounded-xl bg-gray-50">
       <div className="text-xs text-gray-500">{label}</div>
-      <div className={`text-lg ${positive ? 'text-green-600' : ''}`}>{value}</div>
+      <div className={`text-lg ${positive ? "text-green-600" : ""}`}>{value}</div>
     </div>
-  )
+  );
 }
