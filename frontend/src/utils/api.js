@@ -14,7 +14,6 @@ instance.interceptors.request.use(cfg => {
   return cfg
 })
 
-// รวมทุกฟังก์ชันไว้ในอ็อบเจ็กต์เดียว แล้ว "export default" ให้แน่นอน
 const api = {
   base() { return `${API_BASE}/api` },
 
@@ -28,7 +27,7 @@ const api = {
     return data
   },
 
-  // ชื่อสั้นลงเป็น me() เพื่อใช้สะดวก
+  // ตัวหลัก: ใช้เรียก /me
   async me() {
     try {
       const { data } = await instance.get('/me')
@@ -36,6 +35,11 @@ const api = {
     } catch {
       return null
     }
+  },
+
+  // ตัว alias: ใส่คืนเพื่อความเข้ากันได้กับโค้ดเดิม
+  async useMe() {
+    return await this.me()
   },
 
   async getPublic(path) {
@@ -46,4 +50,3 @@ const api = {
 
 export default api
 export { API_BASE }
-
