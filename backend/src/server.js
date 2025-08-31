@@ -308,12 +308,14 @@ app.delete("/api/lots/:key", auth, async (req, res) => {
     await prisma.event.deleteMany({ where: { lotId: lot.id } });
     await prisma.lot.delete({ where: { id: lot.id } });
 
-    res.status(204).send();
+    // เปลี่ยนจาก 204 เป็น 200 + JSON
+    return res.json({ ok: true });
   } catch (e) {
     console.error("delete lot error:", e);
-    res.status(500).json({ error: "SERVER_ERROR" });
+    return res.status(500).json({ error: "SERVER_ERROR" });
   }
 });
+
 
 /* ---------- start ---------- */
 app.listen(PORT, () => {
