@@ -1,12 +1,12 @@
 // backend/src/routes/lots.js
 import express from "express";
 import { PrismaClient } from "@prisma/client";
-import auth from "../utils/auth.js";
+import auth from "../utils/auth.js"; // ต้องมี middleware นี้อยู่แล้ว
 
 const prisma = new PrismaClient();
 const router = express.Router();
 
-/** GET: ล็อตทั้งหมดของผู้ใช้ที่ล็อกอิน */
+/** ลิสต์ล็อตของผู้ใช้ที่ล็อกอิน */
 router.get("/", auth, async (req, res) => {
   try {
     const lots = await prisma.lot.findMany({
@@ -20,13 +20,13 @@ router.get("/", auth, async (req, res) => {
   }
 });
 
-/** GET (public): ข้อมูลล็อต + events ใช้สำหรับสแกน */
+/** public: อ่านล็อต + เหตุการณ์ (ใช้บนหน้า scan/รายละเอียด) */
 router.get("/public/:key", async (req, res) => {
   try {
-    const key = req.params.key.trim();
-    console.log("🔎 Searching lot with key =", key);
+    const keyRaw = req.params.key ?? "";
+    const key = keyRaw.trim();
+    console.log("👉 /public key =", JSON.stringify(keyRaw), "→", key);
 
-    // ✅ insensitive match
     const lot = await prisma.lot.findFirst({
       where: {
         OR: [
@@ -35,12 +35,11 @@ router.get("/public/:key", async (req, res) => {
         ],
       },
     });
-
     if (!lot) return res.status(404).json({ error: "LOT_NOT_FOUND" });
 
     const events = await prisma.event.findMany({
       where: { lotId: lot.id },
-      orderBy: { createdAt: "asc" },
+      orderBy: { timestamp: "asc" }, // สคีมาคุณใช้ timestamp
     });
 
     res.json({ lot, events });
@@ -50,10 +49,11 @@ router.get("/public/:key", async (req, res) => {
   }
 });
 
-/** GET QR PNG ของล็อต */
+/** รูป QR ของล็อต (PNG) */
 router.get("/:key/qr", async (req, res) => {
   try {
-    const key = req.params.key.trim();
+    const key = (req.params.key ?? "").trim();
+
     const lot = await prisma.lot.findFirst({
       where: {
         OR: [
@@ -77,25 +77,25 @@ router.get("/:key/qr", async (req, res) => {
   }
 });
 
-/** POST: สร้างล็อตใหม่ */
+/** สร้างล็อตใหม่ (แนบ event แรกให้ด้วย) */
 router.post("/", auth, async (req, res) => {
   try {
-    const payload = req.body || {};
+    const p = req.body || {};
     const lot = await prisma.lot.create({
       data: {
-        lotId: payload.lotId,
-        cropType: payload.cropType,
-        variety: payload.variety || "",
-        farmName: payload.farmName || "",
-        province: payload.province || "",
-        district: payload.district || "",
-        harvestDate: payload.harvestDate ? new Date(payload.harvestDate) : new Date(),
-        brix: payload.brix ?? null,
-        moisture: payload.moisture ?? null,
-        pesticidePass: payload.pesticidePass ?? null,
-        notes: payload.notes || "",
+        lotId: p.lotId,
+        cropType: p.cropType,
+        variety: p.variety || "",
+        farmName: p.farmName || "",
+        province: p.province || "",
+        district: p.district || "",
+        harvestDate: p.harvestDate ? new Date(p.harvestDate) : new Date(),
+        brix: p.brix ?? null,
+        moisture: p.moisture ?? null,
+        pesticidePass: p.pesticidePass ?? null,
+        notes: p.notes || "",
         ownerId: req.user.id,
-        hash: payload.hash || "TEMP",
+        hash: p.hash || "TEMP",
       },
     });
 
@@ -103,8 +103,13 @@ router.post("/", auth, async (req, res) => {
       data: {
         lotId: lot.id,
         type: "HARVEST_CREATED",
-        locationName: payload.locationName || "",
-        note: payload.note || "",
+        timestamp: new Date(),
+        locationName: p.locationName || "",
+        fromName: null,
+        toName: null,
+        temperature: null,
+        humidity: null,
+        note: p.note || "",
       },
     });
 
@@ -115,10 +120,10 @@ router.post("/", auth, async (req, res) => {
   }
 });
 
-/** POST: เพิ่ม event ให้ล็อต */
+/** เพิ่มเหตุการณ์ให้ล็อต */
 router.post("/:key/events", auth, async (req, res) => {
   try {
-    const key = req.params.key.trim();
+    const key = (req.params.key ?? "").trim();
     const lot = await prisma.lot.findFirst({
       where: {
         OR: [
@@ -129,35 +134,36 @@ router.post("/:key/events", auth, async (req, res) => {
       select: { id: true, ownerId: true },
     });
     if (!lot) return res.status(404).json({ error: "LOT_NOT_FOUND" });
-
     if (req.user.role !== "ADMIN" && req.user.id !== lot.ownerId) {
       return res.status(403).json({ error: "FORBIDDEN" });
     }
 
-    const e = await prisma.event.create({
+    const p = req.body || {};
+    const evt = await prisma.event.create({
       data: {
         lotId: lot.id,
-        type: req.body.type,
-        locationName: req.body.locationName || "",
-        locationFrom: req.body.locationFrom || "",
-        locationTo: req.body.locationTo || "",
-        tempC: req.body.tempC ?? null,
-        humidityPct: req.body.humidityPct ?? null,
-        note: req.body.note || "",
+        type: p.type,
+        timestamp: p.timestamp ? new Date(p.timestamp) : new Date(),
+        locationName: p.locationName || "",
+        fromName: p.fromName || null,
+        toName: p.toName || null,
+        temperature: p.temperature ?? null,
+        humidity: p.humidity ?? null,
+        note: p.note || "",
       },
     });
 
-    res.status(201).json(e);
+    res.status(201).json(evt);
   } catch (err) {
     console.error("Error creating event:", err);
     res.status(500).json({ error: "SERVER_ERROR" });
   }
 });
 
-/** DELETE: ลบล็อต */
+/** ลบล็อต (ลบ event ที่เกี่ยวข้องก่อน) */
 router.delete("/:key", auth, async (req, res) => {
   try {
-    const key = req.params.key.trim();
+    const key = (req.params.key ?? "").trim();
     const lot = await prisma.lot.findFirst({
       where: {
         OR: [
@@ -168,7 +174,6 @@ router.delete("/:key", auth, async (req, res) => {
       select: { id: true, ownerId: true },
     });
     if (!lot) return res.status(404).json({ error: "LOT_NOT_FOUND" });
-
     if (req.user.role !== "ADMIN" && req.user.id !== lot.ownerId) {
       return res.status(403).json({ error: "FORBIDDEN" });
     }
