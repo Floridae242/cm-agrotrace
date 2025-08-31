@@ -16,6 +16,7 @@ export default function Dashboard(){
           nav('/login')
           return
         }
+        // ✅ backend ใช้ /api/lots อยู่แล้ว
         const data = await api.get('/lots')
         setLots(data)
       }catch(e){
@@ -24,7 +25,7 @@ export default function Dashboard(){
       }
     }
     load()
-  }, [])
+  }, [nav])
 
   return (
     <div className="space-y-4">
@@ -32,6 +33,7 @@ export default function Dashboard(){
         <h1 className="text-2xl font-semibold">ล็อตของฉัน</h1>
         <Link className="btn" to="/create">+ สร้างล็อต</Link>
       </div>
+
       <div className="grid md:grid-cols-2 gap-4">
         {lots.map(l => (
           <div key={l.id} className="card">
@@ -48,14 +50,16 @@ export default function Dashboard(){
               แปลง: {l.farmName || '—'} • {l.district || ''} {l.province || ''}
             </div>
             <div className="mt-3 flex gap-2">
-              {/* ✅ ใช้ lotId เป็น path param */}
+              {/* ✅ ส่ง lotId ไป LotDetails */}
               <Link className="btn" to={`/lot/${encodeURIComponent(l.lotId)}`}>
                 รายละเอียด
               </Link>
+              {/* ✅ QR จาก backend */}
               <a
                 className="btn"
                 href={`${api.base()}/lots/${encodeURIComponent(l.lotId)}/qr`}
                 target="_blank"
+                rel="noreferrer"
               >
                 QR
               </a>
