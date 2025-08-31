@@ -1,1 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #0ea5e9;
+}
+
+.btn { @apply px-4 py-2 rounded-2xl bg-sky-500 text-white hover:bg-sky-600 active:scale-95 transition; }
+.card { @apply bg-white rounded-2xl shadow p-4; }
+.input { @apply border rounded-xl px-3 py-2 w-full; }
+.label { @apply text-sm text-slate-600 mb-1; }
+.link { @apply text-sky-600 hover:underline; }
+.badge { @apply inline-block px-2 py-0.5 text-xs rounded-full bg-slate-100; }
 
