@@ -3,7 +3,7 @@ import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api, { API_BASE } from '../utils/api.js'
 
-export default function LotDetails(){
+export default function LotDetails() {
   const nav = useNavigate()
   const { lotId } = useParams()
   const [me, setMe] = React.useState(null)
@@ -17,43 +17,47 @@ export default function LotDetails(){
     (async () => {
       setLoading(true)
       setErr('')
-      const user = await api.me()
-      setMe(user)
-      try{
-        const { lot, events } = await api.get(`/lots/public/${encodeURIComponent(lotId)}`)
-        setLot(lot); setEvents(events)
-      }catch(e){
-        setErr('ไม่พบล็อตนี้')
-      }finally{
+      try {
+        const user = await api.me()
+        setMe(user)
+
+        const resp = await api.get(`/lots/public/${encodeURIComponent(lotId)}`)
+        // กัน error ถ้า backend ไม่ส่ง events
+        setLot(resp.lot || null)
+        setEvents(resp.events || [])
+      } catch (e) {
+        console.error('โหลดล็อตล้มเหลว', e)
+        setErr('ไม่พบล็อตนี้หรือเกิดข้อผิดพลาด')
+      } finally {
         setLoading(false)
       }
     })()
   }, [lotId])
 
   const canDelete = React.useMemo(() => {
-    if(!me || !lot) return false
+    if (!me || !lot) return false
     return me.role === 'ADMIN' || me.id === lot.ownerId
   }, [me, lot])
 
-  async function handleDelete(){
-    if(!canDelete) return
-    if(!confirm(`ยืนยันการลบล็อต: ${lotId} ?`)) return
-    try{
+  async function handleDelete() {
+    if (!canDelete) return
+    if (!confirm(`ยืนยันการลบล็อต: ${lotId} ?`)) return
+    try {
       setDeleting(true)
       await api.del(`/lots/${encodeURIComponent(lotId)}`)
       alert('ลบล็อตสำเร็จ')
       nav('/dashboard')
-    }catch(e){
-      console.error(e)
+    } catch (e) {
+      console.error('ลบไม่สำเร็จ', e)
       alert('ลบไม่สำเร็จ')
-    }finally{
+    } finally {
       setDeleting(false)
     }
   }
 
-  if(loading) return <div className="p-6">กำลังโหลด...</div>
-  if(err) return <div className="p-6 text-red-600">{err}</div>
-  if(!lot) return null
+  if (loading) return <div className="p-6">กำลังโหลด...</div>
+  if (err) return <div className="p-6 text-red-600">{err}</div>
+  if (!lot) return <div className="p-6 text-gray-500">ไม่มีข้อมูลล็อต</div>
 
   return (
     <div className="p-6 space-y-6">
@@ -61,7 +65,6 @@ export default function LotDetails(){
         <h1 className="text-2xl font-semibold">{lot.lotId}</h1>
 
         <div className="flex items-center gap-3">
-          {/* ปุ่มลบจะแสดงเฉพาะเจ้าของหรือแอดมิน */}
           {canDelete && (
             <button
               onClick={handleDelete}
@@ -79,15 +82,26 @@ export default function LotDetails(){
       <div className="grid md:grid-cols-4 gap-4">
         <div className="md:col-span-3 p-4 bg-white rounded-2xl shadow">
           <div className="text-gray-800">
-            <div className="font-medium">{lot.cropType} · {lot.variety || '-'}</div>
-            <div className="text-sm text-gray-500">{lot.farmName} · {lot.district} {lot.province}</div>
+            <div className="font-medium">
+              {lot.cropType} · {lot.variety || '-'}
+            </div>
+            <div className="text-sm text-gray-500">
+              {lot.farmName} · {lot.district} {lot.province}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-            <Info label="เก็บเกี่ยว" value={new Date(lot.harvestDate).toLocaleDateString('th-TH')} />
+            <Info
+              label="เก็บเกี่ยว"
+              value={lot.harvestDate ? new Date(lot.harvestDate).toLocaleDateString('th-TH') : '-'}
+            />
             <Info label="Brix" value={lot.brix ?? '-'} />
             <Info label="ความชื้น" value={lot.moisture ? `${lot.moisture}%` : '-'} />
-            <Info label="สารตกค้าง" value={lot.pesticidePass ? 'ผ่าน' : 'ไม่ผ่าน'} positive={lot.pesticidePass} />
+            <Info
+              label="สารตกค้าง"
+              value={lot.pesticidePass ? 'ผ่าน' : 'ไม่ผ่าน'}
+              positive={lot.pesticidePass}
+            />
           </div>
 
           <div className="text-xs text-gray-500 mt-3 break-all">
@@ -108,25 +122,28 @@ export default function LotDetails(){
       {/* Timeline */}
       <div className="p-4 bg-white rounded-2xl shadow">
         <h2 className="font-semibold mb-3">ไทม์ไลน์</h2>
-        <ul className="space-y-3">
-          {events.map((e) => (
-            <li key={e.id} className="p-3 rounded-xl bg-gray-50">
-              <div className="text-sm font-mono">{e.type}</div>
-              <div className="text-sm text-gray-600">{e.locationName}</div>
-              {e.note && <div className="text-sm text-gray-500">หมายเหตุ: {e.note}</div>}
-              <div className="text-xs text-gray-400">{new Date(e.createdAt).toLocaleString('th-TH')}</div>
-            </li>
-          ))}
-        </ul>
+        {events.length === 0 ? (
+          <div className="text-sm text-gray-500">ยังไม่มีเหตุการณ์</div>
+        ) : (
+          <ul className="space-y-3">
+            {events.map((e) => (
+              <li key={e.id} className="p-3 rounded-xl bg-gray-50">
+                <div className="text-sm font-mono">{e.type}</div>
+                <div className="text-sm text-gray-600">{e.locationName}</div>
+                {e.note && <div className="text-sm text-gray-500">หมายเหตุ: {e.note}</div>}
+                <div className="text-xs text-gray-400">
+                  {new Date(e.createdAt).toLocaleString('th-TH')}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-
-      {/* ฟอร์มเพิ่มเหตุการณ์ (ของเดิมคุณมีอยู่แล้ว) */}
-      {/* ... คงโค้ดส่วนเพิ่มเหตุการณ์เดิมของคุณไว้ ... */}
     </div>
   )
 }
 
-function Info({ label, value, positive }){
+function Info({ label, value, positive }) {
   return (
     <div className="p-3 rounded-xl bg-gray-50">
       <div className="text-xs text-gray-500">{label}</div>
