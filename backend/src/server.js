@@ -18,13 +18,13 @@ const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
 const FRONTEND_PUBLIC_BASE =
   process.env.FRONTEND_PUBLIC_BASE || "http://localhost:5173";
 
-// middleware
+/* ---------- middleware ---------- */
 app.use(helmet());
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "2mb" }));
 app.use(morgan("dev"));
 
-// helpers
+/* ---------- helpers ---------- */
 function computeLotHash(l) {
   const obj = {
     lotId: l.lotId,
@@ -64,10 +64,10 @@ async function auth(req, res, next) {
   }
 }
 
-// routes
+/* ---------- health ---------- */
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
-// auth
+/* ---------- auth ---------- */
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { email, password, name, role } = req.body;
@@ -106,17 +106,19 @@ app.get("/api/me", auth, async (req, res) => {
   res.json({ id: u.id, email: u.email, name: u.name, role: u.role });
 });
 
-/* ---------- PUBLIC lots ต้องมาก่อนเส้นทางที่เฉพาะเจาะจง เพื่อกันชน ---------- */
+/* =========================================================
+   PUBLIC routes (วางก่อนกลุ่มที่ต้อง auth เพื่อลดโอกาสชนแพทเทิร์น)
+   ========================================================= */
 
-// คืนข้อมูล public สำหรับสแกน/ดูรายละเอียดโดยไม่ต้องล็อกอิน
+// ข้อมูล public ของล็อต (รองรับค้นด้วย lotId หรือ id)
 app.get("/api/lots/public/:key", async (req, res) => {
   try {
     const key = (req.params.key || "").trim();
     const lot = await prisma.lot.findFirst({
       where: {
         OR: [
-          { lotId: { equals: key, mode: "insensitive" } }, // LOT-xxx (ไม่สนตัวพิมพ์)
-          { id: key },                                     // หรือใช้ id โดยตรง
+          { lotId: { equals: key, mode: "insensitive" } },
+          { id: key },
         ],
       },
     });
@@ -124,26 +126,34 @@ app.get("/api/lots/public/:key", async (req, res) => {
 
     const events = await prisma.event.findMany({
       where: { lotId: lot.id },
-      orderBy: { timestamp: "asc" }, // ใน schema ใช้ timestamp
+      orderBy: { timestamp: "asc" }, // schema ใช้ timestamp
     });
 
     res.json({ lot, events });
   } catch (e) {
-    console.error("public lot error", e);
+    console.error("public lot error:", e);
     res.status(500).json({ error: "SERVER_ERROR" });
   }
 });
 
-// QR (public)
+// รูป QR (ภาพ PNG) — public
 app.get("/api/lots/:lotId/qr", async (req, res) => {
-  const url = `${FRONTEND_PUBLIC_BASE}/scan/${encodeURIComponent(
-    req.params.lotId
-  )}`;
-  res.setHeader("Content-Type", "image/png");
-  QRCode.toFileStream(res, url, { margin: 1, width: 256 });
+  try {
+    const lotId = req.params.lotId;
+    // เนื้อใน QR จะพาไปหน้า scan บน frontend
+    const url = `${FRONTEND_PUBLIC_BASE}/scan/${encodeURIComponent(lotId)}`;
+    res.type("png");
+    // stream ออกเป็น png
+    await QRCode.toFileStream(res, url, { margin: 1, width: 256 });
+  } catch (e) {
+    console.error("qr error:", e);
+    res.status(500).end();
+  }
 });
 
-/* ---------- PROTECTED lots (ต้องล็อกอิน) ---------- */
+/* =========================================================
+   PROTECTED routes (ต้องล็อกอิน)
+   ========================================================= */
 
 app.post("/api/lots", auth, async (req, res) => {
   try {
@@ -275,6 +285,37 @@ app.post("/api/lots/:lotId/events", auth, async (req, res) => {
   }
 });
 
+/* ---------- DELETE lot (ใหม่) ---------- */
+// key = lotId หรือ id ก็ได้
+app.delete("/api/lots/:key", auth, async (req, res) => {
+  try {
+    const key = (req.params.key || "").trim();
+    const lot = await prisma.lot.findFirst({
+      where: {
+        OR: [
+          { lotId: { equals: key, mode: "insensitive" } },
+          { id: key },
+        ],
+      },
+      select: { id: true, ownerId: true },
+    });
+    if (!lot) return res.status(404).json({ error: "LOT_NOT_FOUND" });
+
+    if (req.user.role !== "ADMIN" && req.user.uid !== lot.ownerId) {
+      return res.status(403).json({ error: "FORBIDDEN" });
+    }
+
+    await prisma.event.deleteMany({ where: { lotId: lot.id } });
+    await prisma.lot.delete({ where: { id: lot.id } });
+
+    res.status(204).send();
+  } catch (e) {
+    console.error("delete lot error:", e);
+    res.status(500).json({ error: "SERVER_ERROR" });
+  }
+});
+
+/* ---------- start ---------- */
 app.listen(PORT, () => {
   console.log(`CM-AgroTrace backend listening on :${PORT}`);
 });
