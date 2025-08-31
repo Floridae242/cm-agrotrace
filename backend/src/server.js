@@ -8,6 +8,12 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import QRCode from "qrcode";
 import { PrismaClient } from "@prisma/client";
+import lotsRouter from './routes/lots.js'
+
+// ...
+app.use(express.json())
+// (มี CORS แล้วก็ดี)
+app.use('/api/lots', lotsRouter)   // <= ผูกเส้นทางตรงนี้
 
 dotenv.config();
 
