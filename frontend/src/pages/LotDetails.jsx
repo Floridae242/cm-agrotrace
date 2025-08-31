@@ -17,14 +17,42 @@ export default function LotDetails() {
     (async () => {
       setLoading(true)
       setErr('')
-      try {
-        const user = await api.me()
-        setMe(user)
 
-        const resp = await api.get(`/lots/public/${encodeURIComponent(lotId)}`)
-        // กัน error ถ้า backend ไม่ส่ง events
-        setLot(resp.lot || null)
-        setEvents(resp.events || [])
+      try {
+        // 1) เช็ค session
+        const user = await api.me()
+        setMe(user || null)
+
+        // 2) ดึงข้อมูล public (รองรับทั้ง 2 รูปแบบ response)
+        const respPublic = await api.get(`/lots/public/${encodeURIComponent(lotId)}`)
+        const lotFromWrapper = respPublic?.lot
+        const eventsFromWrapper = respPublic?.events
+        const lotFromInline = respPublic && !respPublic.lot ? respPublic : null
+
+        // lot: ถ้า backend ส่ง {lot, events} -> ใช้ lot; ถ้าส่ง lot เดี่ยว -> ใช้ respPublic
+        const lotPublic = lotFromWrapper || lotFromInline || null
+        let eventsPublic = Array.isArray(eventsFromWrapper)
+          ? eventsFromWrapper
+          : (Array.isArray(lotPublic?.events) ? lotPublic.events : [])
+
+        // 3) ถ้าล็อกอินอยู่ ลองเรียก protected lot เพื่อ “เติม ownerId” (กรณี public route hide ownerId)
+        let lotWithOwner = lotPublic
+        if (user && lotPublic?.lotId) {
+          try {
+            const privateLot = await api.get(`/lots/${encodeURIComponent(lotPublic.lotId)}`)
+            // merge ownerId และ field ที่อาจขาด
+            lotWithOwner = { ...lotPublic, ownerId: privateLot?.ownerId ?? lotPublic?.ownerId }
+            // ถ้า public ไม่มี events แต่ private มี ก็ใช้ของ private
+            if ((!eventsPublic || eventsPublic.length === 0) && Array.isArray(privateLot?.events)) {
+              eventsPublic = privateLot.events
+            }
+          } catch (e) {
+            // ถ้าเรียก protected ไม่ได้ (เช่น token ไม่พอ) ก็ข้ามไป ใช้ public ต่อ
+          }
+        }
+
+        setLot(lotWithOwner || null)
+        setEvents(Array.isArray(eventsPublic) ? eventsPublic : [])
       } catch (e) {
         console.error('โหลดล็อตล้มเหลว', e)
         setErr('ไม่พบล็อตนี้หรือเกิดข้อผิดพลาด')
@@ -34,9 +62,12 @@ export default function LotDetails() {
     })()
   }, [lotId])
 
+  // เงื่อนไขลบ: ADMIN หรือเป็นเจ้าของ (ต้องมี ownerId ถึงจะเช็คได้)
   const canDelete = React.useMemo(() => {
     if (!me || !lot) return false
-    return me.role === 'ADMIN' || me.id === lot.ownerId
+    if (me.role === 'ADMIN') return true
+    if (!lot.ownerId) return false
+    return me.id === lot.ownerId
   }, [me, lot])
 
   async function handleDelete() {
@@ -126,16 +157,22 @@ export default function LotDetails() {
           <div className="text-sm text-gray-500">ยังไม่มีเหตุการณ์</div>
         ) : (
           <ul className="space-y-3">
-            {events.map((e) => (
-              <li key={e.id} className="p-3 rounded-xl bg-gray-50">
-                <div className="text-sm font-mono">{e.type}</div>
-                <div className="text-sm text-gray-600">{e.locationName}</div>
-                {e.note && <div className="text-sm text-gray-500">หมายเหตุ: {e.note}</div>}
-                <div className="text-xs text-gray-400">
-                  {new Date(e.createdAt).toLocaleString('th-TH')}
-                </div>
-              </li>
-            ))}
+            {events.map((e) => {
+              // รองรับทั้ง timestamp / createdAt / created_at
+              const ts = e.timestamp || e.createdAt || e.created_at
+              return (
+                <li key={e.id} className="p-3 rounded-xl bg-gray-50">
+                  <div className="text-sm font-mono">{e.type}</div>
+                  <div className="text-sm text-gray-600">{e.locationName}</div>
+                  {e.note && <div className="text-sm text-gray-500">หมายเหตุ: {e.note}</div>}
+                  {ts && (
+                    <div className="text-xs text-gray-400">
+                      {new Date(ts).toLocaleString('th-TH')}
+                    </div>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>
