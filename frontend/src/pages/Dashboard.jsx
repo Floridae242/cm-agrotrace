@@ -5,15 +5,21 @@ import api from '../utils/api'
 export default function Dashboard(){
   const [lots, setLots] = useState([])
   const nav = useNavigate()
-  const me = api.useMe()
+  const [me, setMe] = useState(null)
 
   useEffect(()=>{
     async function load(){
       try{
+        const user = await api.me()
+        setMe(user)
+        if(!user) {
+          nav('/login')
+          return
+        }
         const data = await api.get('/lots')
         setLots(data)
       }catch(e){
-        // no token -> go login
+        console.error('โหลดล็อตล้มเหลว', e)
         nav('/login')
       }
     }
@@ -31,13 +37,28 @@ export default function Dashboard(){
           <div key={l.id} className="card">
             <div className="flex items-center justify-between">
               <div className="font-semibold">{l.lotId}</div>
-              <span className="badge">{new Date(l.harvestDate).toLocaleDateString('th-TH')}</span>
+              <span className="badge">
+                {new Date(l.harvestDate).toLocaleDateString('th-TH')}
+              </span>
             </div>
-            <div className="text-slate-600 text-sm mt-1">{l.cropType} • {l.variety || '—'}</div>
-            <div className="text-slate-600 text-sm">แปลง: {l.farmName || '—'} • {l.district || ''} {l.province || ''}</div>
+            <div className="text-slate-600 text-sm mt-1">
+              {l.cropType} • {l.variety || '—'}
+            </div>
+            <div className="text-slate-600 text-sm">
+              แปลง: {l.farmName || '—'} • {l.district || ''} {l.province || ''}
+            </div>
             <div className="mt-3 flex gap-2">
-              <Link className="btn" to={`/lot/${l.lotId}`}>รายละเอียด</Link>
-              <a className="btn" href={`${api.base()}/lots/${l.lotId}/qr`} target="_blank">QR</a>
+              {/* ✅ ใช้ lotId เป็น path param */}
+              <Link className="btn" to={`/lot/${encodeURIComponent(l.lotId)}`}>
+                รายละเอียด
+              </Link>
+              <a
+                className="btn"
+                href={`${api.base()}/lots/${encodeURIComponent(l.lotId)}/qr`}
+                target="_blank"
+              >
+                QR
+              </a>
             </div>
           </div>
         ))}
