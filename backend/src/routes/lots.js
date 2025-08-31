@@ -1,6 +1,7 @@
+// backend/src/routes/lots.js
 import express from "express";
 import { PrismaClient } from "@prisma/client";
-import auth from "../utils/auth.js"; // middleware ตรวจ JWT
+import auth from "../utils/auth.js";
 
 const prisma = new PrismaClient();
 const router = express.Router();
@@ -22,14 +23,19 @@ router.get("/", auth, async (req, res) => {
 /** GET (public): ข้อมูลล็อต + events ใช้สำหรับสแกน */
 router.get("/public/:key", async (req, res) => {
   try {
-    const key = req.params.key;
+    const key = req.params.key.trim();
+    console.log("🔎 Searching lot with key =", key);
 
-    // ✅ รองรับทั้ง lotId และ id
+    // ✅ insensitive match
     const lot = await prisma.lot.findFirst({
       where: {
-        OR: [{ lotId: key }, { id: key }],
+        OR: [
+          { lotId: { equals: key, mode: "insensitive" } },
+          { id: key },
+        ],
       },
     });
+
     if (!lot) return res.status(404).json({ error: "LOT_NOT_FOUND" });
 
     const events = await prisma.event.findMany({
@@ -47,10 +53,13 @@ router.get("/public/:key", async (req, res) => {
 /** GET QR PNG ของล็อต */
 router.get("/:key/qr", async (req, res) => {
   try {
-    const key = req.params.key;
+    const key = req.params.key.trim();
     const lot = await prisma.lot.findFirst({
       where: {
-        OR: [{ lotId: key }, { id: key }],
+        OR: [
+          { lotId: { equals: key, mode: "insensitive" } },
+          { id: key },
+        ],
       },
     });
     if (!lot) return res.status(404).send("NOT_FOUND");
@@ -90,7 +99,6 @@ router.post("/", auth, async (req, res) => {
       },
     });
 
-    // event แรก
     await prisma.event.create({
       data: {
         lotId: lot.id,
@@ -110,10 +118,13 @@ router.post("/", auth, async (req, res) => {
 /** POST: เพิ่ม event ให้ล็อต */
 router.post("/:key/events", auth, async (req, res) => {
   try {
-    const key = req.params.key;
+    const key = req.params.key.trim();
     const lot = await prisma.lot.findFirst({
       where: {
-        OR: [{ lotId: key }, { id: key }],
+        OR: [
+          { lotId: { equals: key, mode: "insensitive" } },
+          { id: key },
+        ],
       },
       select: { id: true, ownerId: true },
     });
@@ -146,10 +157,13 @@ router.post("/:key/events", auth, async (req, res) => {
 /** DELETE: ลบล็อต */
 router.delete("/:key", auth, async (req, res) => {
   try {
-    const key = req.params.key;
+    const key = req.params.key.trim();
     const lot = await prisma.lot.findFirst({
       where: {
-        OR: [{ lotId: key }, { id: key }],
+        OR: [
+          { lotId: { equals: key, mode: "insensitive" } },
+          { id: key },
+        ],
       },
       select: { id: true, ownerId: true },
     });
