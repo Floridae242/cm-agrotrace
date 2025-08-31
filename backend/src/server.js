@@ -1,4 +1,3 @@
-// backend/src/server.js
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -19,13 +18,13 @@ const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
 const FRONTEND_PUBLIC_BASE =
   process.env.FRONTEND_PUBLIC_BASE || "http://localhost:5173";
 
-// ---- middleware ----
+// middleware
 app.use(helmet());
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "2mb" }));
 app.use(morgan("dev"));
 
-// ---- helpers ----
+// helpers
 function computeLotHash(l) {
   const obj = {
     lotId: l.lotId,
@@ -60,17 +59,15 @@ async function auth(req, res, next) {
     const payload = jwt.verify(token, JWT_SECRET);
     req.user = payload;
     next();
-  } catch (e) {
+  } catch {
     return res.status(401).json({ error: "invalid token" });
   }
 }
 
-// ---- routes ----
-
-// Health
+// routes
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
-// Auth
+// auth
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { email, password, name, role } = req.body;
@@ -109,7 +106,45 @@ app.get("/api/me", auth, async (req, res) => {
   res.json({ id: u.id, email: u.email, name: u.name, role: u.role });
 });
 
-// ---- Lots (protected) ----
+/* ---------- PUBLIC lots ต้องมาก่อนเส้นทางที่เฉพาะเจาะจง เพื่อกันชน ---------- */
+
+// คืนข้อมูล public สำหรับสแกน/ดูรายละเอียดโดยไม่ต้องล็อกอิน
+app.get("/api/lots/public/:key", async (req, res) => {
+  try {
+    const key = (req.params.key || "").trim();
+    const lot = await prisma.lot.findFirst({
+      where: {
+        OR: [
+          { lotId: { equals: key, mode: "insensitive" } }, // LOT-xxx (ไม่สนตัวพิมพ์)
+          { id: key },                                     // หรือใช้ id โดยตรง
+        ],
+      },
+    });
+    if (!lot) return res.status(404).json({ error: "not found" });
+
+    const events = await prisma.event.findMany({
+      where: { lotId: lot.id },
+      orderBy: { timestamp: "asc" }, // ใน schema ใช้ timestamp
+    });
+
+    res.json({ lot, events });
+  } catch (e) {
+    console.error("public lot error", e);
+    res.status(500).json({ error: "SERVER_ERROR" });
+  }
+});
+
+// QR (public)
+app.get("/api/lots/:lotId/qr", async (req, res) => {
+  const url = `${FRONTEND_PUBLIC_BASE}/scan/${encodeURIComponent(
+    req.params.lotId
+  )}`;
+  res.setHeader("Content-Type", "image/png");
+  QRCode.toFileStream(res, url, { margin: 1, width: 256 });
+});
+
+/* ---------- PROTECTED lots (ต้องล็อกอิน) ---------- */
+
 app.post("/api/lots", auth, async (req, res) => {
   try {
     const {
@@ -154,7 +189,6 @@ app.post("/api/lots", auth, async (req, res) => {
     };
 
     lotDraft.hash = computeLotHash(lotDraft);
-
     const lot = await prisma.lot.create({ data: lotDraft });
 
     await prisma.event.create({
@@ -181,8 +215,7 @@ app.post("/api/lots", auth, async (req, res) => {
 });
 
 app.get("/api/lots", auth, async (req, res) => {
-  const role = req.user.role;
-  const where = role === "ADMIN" ? {} : { ownerId: req.user.uid };
+  const where = req.user.role === "ADMIN" ? {} : { ownerId: req.user.uid };
   const lots = await prisma.lot.findMany({
     where,
     orderBy: { createdAt: "desc" },
@@ -242,44 +275,6 @@ app.post("/api/lots/:lotId/events", auth, async (req, res) => {
   }
 });
 
-// ---- Lots (public) ----
-// ✅ คืน { lot, events } ให้ตรงกับ frontend และรองรับทั้ง lotId/id + case-insensitive
-app.get("/api/lots/public/:key", async (req, res) => {
-  try {
-    const raw = req.params.key ?? "";
-    const key = raw.trim();
-    const lot = await prisma.lot.findFirst({
-      where: {
-        OR: [
-          { lotId: { equals: key, mode: "insensitive" } },
-          { id: key },
-        ],
-      },
-    });
-    if (!lot) return res.status(404).json({ error: "not found" });
-
-    const events = await prisma.event.findMany({
-      where: { lotId: lot.id },
-      orderBy: { timestamp: "asc" },
-    });
-
-    res.json({ lot, events });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "SERVER_ERROR" });
-  }
-});
-
-// QR for a given lotId -> points to frontend public route
-app.get("/api/lots/:lotId/qr", async (req, res) => {
-  const url = `${FRONTEND_PUBLIC_BASE}/scan/${encodeURIComponent(
-    req.params.lotId
-  )}`;
-  res.setHeader("Content-Type", "image/png");
-  QRCode.toFileStream(res, url, { margin: 1, width: 256 });
-});
-
-// ---- start ----
 app.listen(PORT, () => {
   console.log(`CM-AgroTrace backend listening on :${PORT}`);
 });
