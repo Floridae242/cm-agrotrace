@@ -1,61 +1,70 @@
 // frontend/src/utils/api.js
 import axios from 'axios'
 
-// ใช้ ENV ถ้ามี; ถ้าไม่มีให้ fallback เป็น "โดเมน BACKEND" โดยตรง
-// *** แก้แล้ว: ชี้ไป https://cm-agrotrace.onrender.com ไม่ใช่โดเมน frontend ***
+// ใช้ ENV ถ้ามี; ถ้าไม่มีให้ fallback เป็นโดเมน BACKEND โดยตรง
 const API_BASE =
-  (import.meta.env && import.meta.env.VITE_API_BASE)
-    ? import.meta.env.VITE_API_BASE
-    : 'https://cm-agrotrace.onrender.com';
+  (import.meta?.env?.VITE_API_BASE && String(import.meta.env.VITE_API_BASE).trim())
+    ? String(import.meta.env.VITE_API_BASE).trim()
+    : 'https://cm-agrotrace.onrender.com'
 
+// อินสแตนซ์หลักที่อิง /api
 const instance = axios.create({
   baseURL: `${API_BASE}/api`,
   timeout: 15000,
-  headers: { 'Content-Type': 'application/json' }
-});
+  headers: { 'Content-Type': 'application/json' },
+})
 
-// แนบ token อัตโนมัติถ้ามี
-instance.interceptors.request.use(cfg => {
-  const t = localStorage.getItem('token') || '';
-  if (t) cfg.headers.Authorization = `Bearer ${t}`;
-  return cfg;
-});
+// แนบ Bearer token อัตโนมัติเมื่อมี
+instance.interceptors.request.use((cfg) => {
+  const t = localStorage.getItem('token') || ''
+  if (t) cfg.headers.Authorization = `Bearer ${t}`
+  return cfg
+})
 
-// รวมเมธอดไว้ในออบเจ็กต์เดียวและ export default
+// รวมเมธอดใช้งานทั้งหมด
 const api = {
-  base() { return `${API_BASE}/api`; },
+  // base URL ของ API (เผื่อไว้ใช้ประกอบ URL รูป/ไฟล์ ฯลฯ)
+  base() {
+    return `${API_BASE}/api`
+  },
 
+  // HTTP helpers
   async get(path) {
-    const { data } = await instance.get(path);
-    return data;
+    const { data } = await instance.get(path)
+    return data
   },
 
   async post(path, payload) {
-    const { data } = await instance.post(path, payload);
-    return data;
+    const { data } = await instance.post(path, payload)
+    return data
   },
 
-  // ใช้ตรวจ session ปัจจุบัน
+  async del(path) {
+    const { data } = await instance.delete(path)
+    return data
+  },
+
+  // ตรวจ session ของผู้ใช้ปัจจุบัน
   async me() {
     try {
-      const { data } = await instance.get('/me');
-      return data;
+      const { data } = await instance.get('/me')
+      return data
     } catch {
-      return null;
+      return null
     }
   },
 
-  // alias เพื่อความเข้ากันได้กับโค้ดเดิมที่เรียก api.useMe()
+  // alias สำหรับโค้ดเก่าที่เรียก useMe()
   async useMe() {
-    return await this.me();
+    return await this.me()
   },
 
-  // public endpoint (ไม่ต้อง auth)
+  // เรียก public endpoint ที่ไม่ต้อง auth (เช่น /lots/public/:lotId)
   async getPublic(path) {
-    const { data } = await axios.get(`${API_BASE}/api${path}`);
-    return data;
-  }
-};
+    const { data } = await axios.get(`${API_BASE}/api${path}`)
+    return data
+  },
+}
 
-export default api;
-export { API_BASE };
+export default api
+export { API_BASE }
