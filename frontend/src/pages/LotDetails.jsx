@@ -165,9 +165,9 @@ export default function LotDetails() {
         {/* QR */}
         <div className="p-4 bg-white rounded-2xl shadow flex items-center justify-center">
           <img
-            src={`${API_BASE}/api/lots/${encodeURIComponent(lot.lotId)}/qr`}
-            alt="qr"
-            className="w-48 h-48 object-contain"
+              src={`${window.location.origin}/api/lots/${encodeURIComponent(lot.lotId)}/qr`}
+              alt="qr"
+              className="w-48 h-48 object-contain"
           />
         </div>
       </div>
