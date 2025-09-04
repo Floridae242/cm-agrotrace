@@ -1,12 +1,12 @@
+// frontend/src/pages/LotDetails.jsx
 import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../utils/api.js'
 
-// ==== ตั้งค่า BACKEND BASE ====
-// ใส่ใน .env.production:  VITE_API_BASE=https://cm-agrotrace.onrender.com
-// ใส่ใน .env.development: VITE_API_BASE=http://localhost:8080
-const RAW_BASE = (import.meta?.env?.VITE_API_BASE || '').trim()
-const BACKEND_BASE = RAW_BASE.replace(/\/$/, '') // ตัด / ท้ายออก ถ้ามี
+// FRONTEND กับ BACKEND อยู่คนละโดเมน ⇒ ต้องใช้ VITE_API_BASE ชี้ไป backend
+// .env.production  =>  VITE_API_BASE=https://cm-agrotrace.onrender.com
+const BACKEND_BASE =
+  (import.meta?.env?.VITE_API_BASE || window.location.origin).replace(/\/$/, '')
 
 export default function LotDetails() {
   const nav = useNavigate()
@@ -17,8 +17,6 @@ export default function LotDetails() {
   const [loading, setLoading] = React.useState(true)
   const [deleting, setDeleting] = React.useState(false)
   const [err, setErr] = React.useState('')
-
-  // state ฟอร์มเพิ่มเหตุการณ์
   const [saving, setSaving] = React.useState(false)
   const [form, setForm] = React.useState({
     type: 'TRANSPORTED',
@@ -38,7 +36,6 @@ export default function LotDetails() {
         const user = await api.me()
         setMe(user)
 
-        // โหลดข้อมูล public ของล็อต
         const resp = await api.get(`/lots/public/${encodeURIComponent(lotId)}`)
         setLot(resp.lot || null)
         setEvents(resp.events || [])
@@ -77,7 +74,6 @@ export default function LotDetails() {
     if (!canWrite || !lot) return
     try {
       setSaving(true)
-
       const payload = {
         type: form.type,
         locationName: form.locationName || null,
@@ -87,7 +83,6 @@ export default function LotDetails() {
         humidity: form.humidity === '' ? null : Number(form.humidity),
         note: form.note || null
       }
-
       await api.post(`/lots/${encodeURIComponent(lot.lotId)}/events`, payload)
 
       const refreshed = await api.get(`/lots/public/${encodeURIComponent(lotId)}`)
@@ -114,14 +109,15 @@ export default function LotDetails() {
   if (err) return <div className="p-6 text-red-600">{err}</div>
   if (!lot) return <div className="p-6 text-gray-500">ไม่มีข้อมูลล็อต</div>
 
-  // ===== QR src: ชี้ไป BACKEND จริง + กันแคช =====
-  const qrSrc = `${BACKEND_BASE}/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
+  // สร้าง URL QR จาก BACKEND จริง + กันแคช
+  const qrSrc = React.useMemo(() =>
+    `${BACKEND_BASE}/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`,
+  [BACKEND_BASE, lot?.lotId])
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-start justify-between">
         <h1 className="text-2xl font-semibold">{lot.lotId}</h1>
-
         <div className="flex items-center gap-3">
           {canWrite && (
             <button
@@ -167,7 +163,7 @@ export default function LotDetails() {
           </div>
         </div>
 
-        {/* ✅ QR จาก backend จริง */}
+        {/* QR จาก backend จริง */}
         <div className="p-4 bg-white rounded-2xl shadow flex items-center justify-center">
           <img
             key={qrSrc}
@@ -175,12 +171,12 @@ export default function LotDetails() {
             alt="qr"
             className="w-48 h-48 object-contain"
             onError={(e) => {
-              // รีโหลดอีกครั้งกันแคชหรือเครือข่ายสะดุด
               e.currentTarget.src =
                 `${BACKEND_BASE}/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
             }}
           />
         </div>
+      </div>
 
       {/* Timeline */}
       <div className="p-4 bg-white rounded-2xl shadow">
@@ -296,6 +292,7 @@ export default function LotDetails() {
   )
 }
 
+// ----------------- helpers -----------------
 function Info({ label, value, positive }) {
   return (
     <div className="p-3 rounded-xl bg-gray-50">
