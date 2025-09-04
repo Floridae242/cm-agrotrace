@@ -112,7 +112,7 @@ export default function LotDetails() {
   if (!lot) return <div className="p-6 text-gray-500">ไม่มีข้อมูลล็อต</div>
 
   // ✅ สร้าง URL QR + cache-buster
-  const qrSrc = `/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
+  const qrSrc = `/api/lots/${encodeURIComponent(lot.lotId)}/qr`;
 
   return (
     <div className="p-6 space-y-6">
@@ -166,18 +166,17 @@ export default function LotDetails() {
 
         {/* ✅ QR */}
         <div className="p-4 bg-white rounded-2xl shadow flex items-center justify-center">
-          <img
-            key={qrSrc} // บังคับ React remount ทุกครั้ง
-            src={qrSrc}
-            alt="qr"
-            className="w-48 h-48 object-contain"
-            onError={(e) => {
-              // fallback กัน path error/cache
-              e.currentTarget.src = `/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
-            }}
-          />
-        </div>
-      </div>
+                <img
+                  key={qrSrc}
+                  src={qrSrc}
+                  alt="qr"
+                  className="w-48 h-48 object-contain"
+                  onError={(e) => {
+                    // กันเคสแคช/ข้อผิดพลาดชั่วคราว
+                    e.currentTarget.src = `/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
+                  }}
+                />
+</div>
 
       {/* Timeline */}
       <div className="p-4 bg-white rounded-2xl shadow">
