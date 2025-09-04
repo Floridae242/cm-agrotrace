@@ -1,7 +1,7 @@
 // frontend/src/pages/LotDetails.jsx
 import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import api from '../utils/api.js'
+import api, { buildApiUrl } from '../utils/api.js'
 
 // FRONTEND กับ BACKEND อยู่คนละโดเมน ⇒ ต้องใช้ VITE_API_BASE ชี้ไป backend
 // .env.production  =>  VITE_API_BASE=https://cm-agrotrace.onrender.com
@@ -110,9 +110,7 @@ export default function LotDetails() {
   if (!lot) return <div className="p-6 text-gray-500">ไม่มีข้อมูลล็อต</div>
 
   // สร้าง URL QR จาก BACKEND จริง + กันแคช
-  const qrSrc = React.useMemo(() =>
-    `${BACKEND_BASE}/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`,
-  [BACKEND_BASE, lot?.lotId])
+  const qrSrc = `${buildApiUrl(`/lots/${encodeURIComponent(lot.lotId)}/qr`)}?ts=${Date.now()}`
 
   return (
     <div className="p-6 space-y-6">
@@ -166,15 +164,14 @@ export default function LotDetails() {
         {/* QR จาก backend จริง */}
         <div className="p-4 bg-white rounded-2xl shadow flex items-center justify-center">
           <img
-            key={qrSrc}
-            src={qrSrc}
-            alt="qr"
-            className="w-48 h-48 object-contain"
-            onError={(e) => {
-              e.currentTarget.src =
-                `${BACKEND_BASE}/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
-            }}
-          />
+                key={qrSrc}
+                src={qrSrc}
+                alt="qr"
+                className="w-48 h-48 object-contain"
+                onError={(e) => {
+                e.currentTarget.src = `${buildApiUrl(`/lots/${encodeURIComponent(lot.lotId)}/qr`)}?ts=${Date.now()}`
+                    }}
+              />
         </div>
       </div>
 
