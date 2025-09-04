@@ -2,6 +2,12 @@ import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../utils/api.js'
 
+// ==== ตั้งค่า BACKEND BASE ====
+// ใส่ใน .env.production:  VITE_API_BASE=https://cm-agrotrace.onrender.com
+// ใส่ใน .env.development: VITE_API_BASE=http://localhost:8080
+const RAW_BASE = (import.meta?.env?.VITE_API_BASE || '').trim()
+const BACKEND_BASE = RAW_BASE.replace(/\/$/, '') // ตัด / ท้ายออก ถ้ามี
+
 export default function LotDetails() {
   const nav = useNavigate()
   const { lotId } = useParams()
@@ -72,7 +78,6 @@ export default function LotDetails() {
     try {
       setSaving(true)
 
-      // แปลงค่าเลข
       const payload = {
         type: form.type,
         locationName: form.locationName || null,
@@ -85,11 +90,9 @@ export default function LotDetails() {
 
       await api.post(`/lots/${encodeURIComponent(lot.lotId)}/events`, payload)
 
-      // โหลดรายการ event ใหม่
       const refreshed = await api.get(`/lots/public/${encodeURIComponent(lotId)}`)
       setEvents(refreshed.events || [])
 
-      // ล้างฟอร์ม
       setForm({
         type: 'TRANSPORTED',
         locationName: '',
@@ -111,8 +114,8 @@ export default function LotDetails() {
   if (err) return <div className="p-6 text-red-600">{err}</div>
   if (!lot) return <div className="p-6 text-gray-500">ไม่มีข้อมูลล็อต</div>
 
-  // ✅ สร้าง URL QR + cache-buster
-  const qrSrc = `/api/lots/${encodeURIComponent(lot.lotId)}/qr`;
+  // ===== QR src: ชี้ไป BACKEND จริง + กันแคช =====
+  const qrSrc = `${BACKEND_BASE}/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
 
   return (
     <div className="p-6 space-y-6">
@@ -164,19 +167,21 @@ export default function LotDetails() {
           </div>
         </div>
 
-        {/* ✅ QR */}
+        {/* ✅ QR จาก backend จริง */}
         <div className="p-4 bg-white rounded-2xl shadow flex items-center justify-center">
-                <img
-                  key={qrSrc}
-                  src={qrSrc}
-                  alt="qr"
-                  className="w-48 h-48 object-contain"
-                  onError={(e) => {
-                    // กันเคสแคช/ข้อผิดพลาดชั่วคราว
-                    e.currentTarget.src = `/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
-                  }}
-                />
-</div>
+          <img
+            key={qrSrc}
+            src={qrSrc}
+            alt="qr"
+            className="w-48 h-48 object-contain"
+            onError={(e) => {
+              // รีโหลดอีกครั้งกันแคชหรือเครือข่ายสะดุด
+              e.currentTarget.src =
+                `${BACKEND_BASE}/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
+            }}
+          />
+        </div>
+      </div>
 
       {/* Timeline */}
       <div className="p-4 bg-white rounded-2xl shadow">
