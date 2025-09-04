@@ -140,11 +140,17 @@ app.get("/api/lots/public/:key", async (req, res) => {
 app.get("/api/lots/:lotId/qr", async (req, res) => {
   try {
     const lotId = req.params.lotId;
-    // เนื้อใน QR จะพาไปหน้า scan บน frontend
-    const url = `${FRONTEND_PUBLIC_BASE}/scan/${encodeURIComponent(lotId)}`;
-    res.type("png");
-    // stream ออกเป็น png
-    await QRCode.toFileStream(res, url, { margin: 1, width: 256 });
+    const base = (process.env.FRONTEND_PUBLIC_BASE || "").replace(/\/$/, "");
+    const url = `${base}/scan/${encodeURIComponent(lotId)}`;
+
+    const png = await QRCode.toBuffer(url, { type: "png", margin: 1, width: 256 });
+    res.set({
+      "Content-Type": "image/png",
+      "Content-Length": png.length,
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      "Content-Disposition": 'inline; filename="qr.png"',
+    });
+    res.send(png);
   } catch (e) {
     console.error("qr error:", e);
     res.status(500).end();
@@ -301,7 +307,6 @@ app.delete("/api/lots/:key", auth, async (req, res) => {
     });
     if (!lot) return res.status(404).json({ error: "LOT_NOT_FOUND" });
 
-    if (req.user.role !== "ADMIN" && req.user.uid !== lot.ownerId) {
       return res.status(403).json({ error: "FORBIDDEN" });
     }
 
