@@ -1,3 +1,4 @@
+// backend/src/server.js
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -16,7 +17,7 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
 const FRONTEND_PUBLIC_BASE =
-  process.env.FRONTEND_PUBLIC_BASE || "http://localhost:5173";
+  (process.env.FRONTEND_PUBLIC_BASE || "http://localhost:5173").replace(/\/$/, "");
 
 /* ---------- middleware ---------- */
 app.use(helmet());
@@ -107,10 +108,10 @@ app.get("/api/me", auth, async (req, res) => {
 });
 
 /* =========================================================
-   PUBLIC routes (วางก่อนกลุ่มที่ต้อง auth เพื่อลดโอกาสชนแพทเทิร์น)
+   PUBLIC routes
    ========================================================= */
 
-// ข้อมูล public ของล็อต (รองรับค้นด้วย lotId หรือ id)
+// public lot (ค้นได้ทั้ง lotId หรือ id)
 app.get("/api/lots/public/:key", async (req, res) => {
   try {
     const key = (req.params.key || "").trim();
@@ -126,7 +127,7 @@ app.get("/api/lots/public/:key", async (req, res) => {
 
     const events = await prisma.event.findMany({
       where: { lotId: lot.id },
-      orderBy: { timestamp: "asc" }, // schema ใช้ timestamp
+      orderBy: { timestamp: "asc" },
     });
 
     res.json({ lot, events });
@@ -136,12 +137,11 @@ app.get("/api/lots/public/:key", async (req, res) => {
   }
 });
 
-// รูป QR (ภาพ PNG) — public
+// รูป QR (PNG) — public
 app.get("/api/lots/:lotId/qr", async (req, res) => {
   try {
     const lotId = req.params.lotId;
-    const base = (process.env.FRONTEND_PUBLIC_BASE || "").replace(/\/$/, "");
-    const url = `${base}/scan/${encodeURIComponent(lotId)}`;
+    const url = `${FRONTEND_PUBLIC_BASE}/scan/${encodeURIComponent(lotId)}`;
 
     const png = await QRCode.toBuffer(url, { type: "png", margin: 1, width: 256 });
     res.set({
@@ -158,7 +158,7 @@ app.get("/api/lots/:lotId/qr", async (req, res) => {
 });
 
 /* =========================================================
-   PROTECTED routes (ต้องล็อกอิน)
+   PROTECTED routes
    ========================================================= */
 
 app.post("/api/lots", auth, async (req, res) => {
@@ -212,9 +212,9 @@ app.post("/api/lots", auth, async (req, res) => {
         lotId: lot.id,
         type: "HARVEST_CREATED",
         timestamp: new Date(),
-        locationName: district
-          ? `${district}, ${province || ""}`.trim()
-          : province || "",
+        locationName: lot.district
+          ? `${lot.district}, ${lot.province || ""}`.trim()
+          : lot.province || "",
         fromName: null,
         toName: null,
         temperature: null,
@@ -291,8 +291,7 @@ app.post("/api/lots/:lotId/events", auth, async (req, res) => {
   }
 });
 
-/* ---------- DELETE lot (ใหม่) ---------- */
-// key = lotId หรือ id ก็ได้
+// delete lot (รับทั้ง lotId หรือ id)
 app.delete("/api/lots/:key", auth, async (req, res) => {
   try {
     const key = (req.params.key || "").trim();
@@ -307,20 +306,19 @@ app.delete("/api/lots/:key", auth, async (req, res) => {
     });
     if (!lot) return res.status(404).json({ error: "LOT_NOT_FOUND" });
 
+    if (req.user.role !== "ADMIN" && req.user.uid !== lot.ownerId) {
       return res.status(403).json({ error: "FORBIDDEN" });
     }
 
     await prisma.event.deleteMany({ where: { lotId: lot.id } });
     await prisma.lot.delete({ where: { id: lot.id } });
 
-    // เปลี่ยนจาก 204 เป็น 200 + JSON
     return res.json({ ok: true });
   } catch (e) {
     console.error("delete lot error:", e);
     return res.status(500).json({ error: "SERVER_ERROR" });
   }
 });
-
 
 /* ---------- start ---------- */
 app.listen(PORT, () => {
