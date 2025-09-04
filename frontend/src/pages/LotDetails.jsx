@@ -181,7 +181,6 @@ export default function LotDetails() {
             }}
           />
         </div>
-      </div>
 
       {/* Timeline */}
       <div className="p-4 bg-white rounded-2xl shadow">
