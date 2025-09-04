@@ -1,7 +1,6 @@
-// frontend/src/pages/LotDetails.jsx
 import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import api, { API_BASE } from '../utils/api.js'
+import api from '../utils/api.js'
 
 export default function LotDetails() {
   const nav = useNavigate()
@@ -112,6 +111,9 @@ export default function LotDetails() {
   if (err) return <div className="p-6 text-red-600">{err}</div>
   if (!lot) return <div className="p-6 text-gray-500">ไม่มีข้อมูลล็อต</div>
 
+  // ✅ สร้าง URL QR + cache-buster
+  const qrSrc = `/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-start justify-between">
@@ -162,12 +164,17 @@ export default function LotDetails() {
           </div>
         </div>
 
-        {/* QR */}
+        {/* ✅ QR */}
         <div className="p-4 bg-white rounded-2xl shadow flex items-center justify-center">
           <img
-              src={`${window.location.origin}/api/lots/${encodeURIComponent(lot.lotId)}/qr`}
-              alt="qr"
-              className="w-48 h-48 object-contain"
+            key={qrSrc} // บังคับ React remount ทุกครั้ง
+            src={qrSrc}
+            alt="qr"
+            className="w-48 h-48 object-contain"
+            onError={(e) => {
+              // fallback กัน path error/cache
+              e.currentTarget.src = `/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
+            }}
           />
         </div>
       </div>
@@ -193,7 +200,7 @@ export default function LotDetails() {
         )}
       </div>
 
-      {/* ฟอร์มเพิ่มเหตุการณ์ (แสดงเฉพาะเจ้าของ/แอดมิน) */}
+      {/* ฟอร์มเพิ่มเหตุการณ์ */}
       {canWrite && (
         <div className="p-4 bg-white rounded-2xl shadow">
           <h2 className="font-semibold mb-3">เพิ่มเหตุการณ์</h2>
