@@ -114,11 +114,25 @@ export default function LotDetails() {
   if (err) return <div className="p-6 text-red-600">{err}</div>;
   if (!lot) return <div className="p-6 text-gray-500">ไม่มีข้อมูลล็อต</div>;
 
-  // คำนวณ src ของรูป QR
+  // URL รูป QR
   const BACKEND = API_BASE.replace(/\/$/, '');
   const qrSrc = lot?.lotId
     ? `${BACKEND}/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
     : '';
+
+  // ปัจจุบันถึงที่ไหน (ใช้ toName ล่าสุด ก่อน fallback เป็น locationName)
+  const currentPlace = React.useMemo(() => {
+    if (!events || events.length === 0) return '-';
+    const found = [...events].reverse().find(ev => ev.toName || ev.locationName);
+    return found?.toName || found?.locationName || '-';
+  }, [events]);
+
+  // เวลาอัปเดตล่าสุด
+  const lastUpdatedAt = React.useMemo(() => {
+    if (!events || events.length === 0) return '';
+    const last = events[events.length - 1];
+    return last?.timestamp ? new Date(last.timestamp).toLocaleString('th-TH') : '';
+  }, [events]);
 
   return (
     <div className="p-6 space-y-6">
@@ -151,7 +165,7 @@ export default function LotDetails() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4">
             <Info
               label="เก็บเกี่ยว"
               value={lot.harvestDate ? new Date(lot.harvestDate).toLocaleDateString('th-TH') : '-'}
@@ -163,9 +177,13 @@ export default function LotDetails() {
               value={lot.pesticidePass ? 'ผ่าน' : 'ไม่ผ่าน'}
               positive={lot.pesticidePass}
             />
+            <Info label="ปัจจุบันถึง" value={currentPlace} />
           </div>
 
           <div className="text-xs text-gray-500 mt-3 break-all">Hash: {lot.hash}</div>
+          {lastUpdatedAt && (
+            <div className="text-xs text-gray-500 mt-1">อัปเดตล่าสุด: {lastUpdatedAt}</div>
+          )}
         </div>
 
         {/* QR */}
@@ -248,7 +266,6 @@ export default function LotDetails() {
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
               >
-                {/* ใช้เฉพาะค่าที่ backend รองรับใน prisma enum */}
                 <option value="TRANSPORTED">TRANSPORTED</option>
                 <option value="INSPECTED">INSPECTED</option>
                 <option value="SENSOR_READING">SENSOR_READING</option>
