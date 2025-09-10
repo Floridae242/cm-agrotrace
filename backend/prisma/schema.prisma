@@ -16,6 +16,7 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // ฝั่งตรงข้าม relation
   ownerLots    Lot[]    @relation("OwnerLots")
 }
 
@@ -28,38 +29,38 @@ enum Role {
 }
 
 model Lot {
-  id          String   @id @default(cuid())
-  lotId       String   @unique
-  cropType    String
-  variety     String?
-  farmName    String?
-  province    String?
-  district    String?
-  harvestDate DateTime
-  brix        Float?
-  moisture    Float?
+  id            String   @id @default(cuid())
+  lotId         String   @unique
+  cropType      String
+  variety       String?
+  farmName      String?
+  province      String?
+  district      String?
+  harvestDate   DateTime
+  brix          Float?
+  moisture      Float?
   pesticidePass Boolean?
-  notes       String?
-  owner       User     @relation("OwnerLots", fields: [ownerId], references: [id])
-  ownerId     String
-  events      Event[]
-  hash        String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  notes         String?
+  owner         User     @relation("OwnerLots", fields: [ownerId], references: [id])
+  ownerId       String
+  events        Event[]
+  hash          String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Event {
-  id          String     @id @default(cuid())
-  lot         Lot        @relation(fields: [lotId], references: [id])
-  lotId       String
-  type        EventType
-  timestamp   DateTime   @default(now())
+  id           String    @id @default(cuid())
+  lot          Lot       @relation(fields: [lotId], references: [id])
+  lotId        String
+  type         EventType
+  timestamp    DateTime  @default(now())
   locationName String?
-  fromName    String?
-  toName      String?
-  temperature Float?
-  humidity    Float?
-  note        String?
+  fromName     String?
+  toName       String?
+  temperature  Float?
+  humidity     Float?
+  note         String?
 }
 
 enum EventType {
@@ -70,4 +71,3 @@ enum EventType {
   MERGED
   SOLD
 }
-
