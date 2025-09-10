@@ -24,7 +24,12 @@ export async function register(req, res) {
       select: { id: true, email: true, name: true, role: true },
     });
 
-    const token = jwt.sign({ sub: user.id, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign(
+      { uid: user.id, role: user.role, name: user.name },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
     return res.status(201).json({ user, token });
   } catch (e) {
     console.error("REGISTER_ERROR", e);
