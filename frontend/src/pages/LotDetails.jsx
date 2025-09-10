@@ -1,19 +1,29 @@
 // frontend/src/pages/LotDetails.jsx
-import React from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import api, { API_BASE } from '../utils/api.js'   // ใช้ API_BASE เพื่อชี้โดเมน backend
+import React from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import api, { API_BASE } from '../utils/api.js';
+
+function Info({ label, value, positive }) {
+  return (
+    <div className="p-3 rounded-xl bg-gray-50">
+      <div className="text-xs text-gray-500">{label}</div>
+      <div className={`text-lg ${positive ? 'text-green-600' : ''}`}>{value}</div>
+    </div>
+  );
+}
 
 export default function LotDetails() {
-  const nav = useNavigate()
-  const { lotId } = useParams()
-  const [me, setMe] = React.useState(null)
-  const [lot, setLot] = React.useState(null)
-  const [events, setEvents] = React.useState([])
-  const [loading, setLoading] = React.useState(true)
-  const [deleting, setDeleting] = React.useState(false)
-  const [err, setErr] = React.useState('')
+  const nav = useNavigate();
+  const { lotId } = useParams();
 
-  const [saving, setSaving] = React.useState(false)
+  const [me, setMe] = React.useState(null);
+  const [lot, setLot] = React.useState(null);
+  const [events, setEvents] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [deleting, setDeleting] = React.useState(false);
+  const [err, setErr] = React.useState('');
+
+  const [saving, setSaving] = React.useState(false);
   const [form, setForm] = React.useState({
     type: 'TRANSPORTED',
     locationName: '',
@@ -21,54 +31,54 @@ export default function LotDetails() {
     toName: '',
     temperature: '',
     humidity: '',
-    note: ''
-  })
+    note: '',
+  });
 
   React.useEffect(() => {
     (async () => {
-      setLoading(true)
-      setErr('')
+      setLoading(true);
+      setErr('');
       try {
-        const user = await api.me()
-        setMe(user)
-        const resp = await api.getPublic(`/lots/public/${encodeURIComponent(lotId)}`)
-        setLot(resp.lot || null)
-        setEvents(resp.events || [])
+        const user = await api.me();
+        setMe(user);
+        const resp = await api.getPublic(`/lots/public/${encodeURIComponent(lotId)}`);
+        setLot(resp.lot || null);
+        setEvents(resp.events || []);
       } catch (e) {
-        console.error('โหลดล็อตล้มเหลว', e)
-        setErr('ไม่พบล็อตนี้หรือเกิดข้อผิดพลาด')
+        console.error('โหลดล็อตล้มเหลว', e);
+        setErr('ไม่พบล็อตนี้หรือเกิดข้อผิดพลาด');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    })()
-  }, [lotId])
+    })();
+  }, [lotId]);
 
   const canWrite = React.useMemo(() => {
-    if (!me || !lot) return false
-    return me.role === 'ADMIN' || me.id === lot.ownerId
-  }, [me, lot])
+    if (!me || !lot) return false;
+    return me.role === 'ADMIN' || me.id === lot.ownerId;
+  }, [me, lot]);
 
   async function handleDelete() {
-    if (!canWrite) return
-    if (!confirm(`ยืนยันการลบล็อต: ${lotId} ?`)) return
+    if (!canWrite) return;
+    if (!confirm(`ยืนยันการลบล็อต: ${lotId} ?`)) return;
     try {
-      setDeleting(true)
-      await api.del(`/lots/${encodeURIComponent(lotId)}`)
-      alert('ลบล็อตสำเร็จ')
-      nav('/dashboard')
+      setDeleting(true);
+      await api.del(`/lots/${encodeURIComponent(lotId)}`);
+      alert('ลบล็อตสำเร็จ');
+      nav('/dashboard');
     } catch (e) {
-      console.error('ลบไม่สำเร็จ', e)
-      alert('ลบไม่สำเร็จ')
+      console.error('ลบไม่สำเร็จ', e);
+      alert('ลบไม่สำเร็จ');
     } finally {
-      setDeleting(false)
+      setDeleting(false);
     }
   }
 
   async function submitEvent(e) {
-    e.preventDefault()
-    if (!canWrite || !lot) return
+    e.preventDefault();
+    if (!canWrite || !lot) return;
     try {
-      setSaving(true)
+      setSaving(true);
       const payload = {
         type: form.type,
         locationName: form.locationName || null,
@@ -76,12 +86,12 @@ export default function LotDetails() {
         toName: form.toName || null,
         temperature: form.temperature === '' ? null : Number(form.temperature),
         humidity: form.humidity === '' ? null : Number(form.humidity),
-        note: form.note || null
-      }
-      await api.post(`/lots/${encodeURIComponent(lot.lotId)}/events`, payload)
+        note: form.note || null,
+      };
+      await api.post(`/lots/${encodeURIComponent(lot.lotId)}/events`, payload);
 
-      const refreshed = await api.getPublic(`/lots/public/${encodeURIComponent(lotId)}`)
-      setEvents(refreshed.events || [])
+      const refreshed = await api.getPublic(`/lots/public/${encodeURIComponent(lotId)}`);
+      setEvents(refreshed.events || []);
 
       setForm({
         type: 'TRANSPORTED',
@@ -90,30 +100,29 @@ export default function LotDetails() {
         toName: '',
         temperature: '',
         humidity: '',
-        note: ''
-      })
+        note: '',
+      });
     } catch (err) {
-      console.error('บันทึกเหตุการณ์ล้มเหลว', err)
-      alert('บันทึกเหตุการณ์ไม่สำเร็จ')
+      console.error('บันทึกเหตุการณ์ล้มเหลว', err);
+      alert('บันทึกเหตุการณ์ไม่สำเร็จ');
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
-  // ไม่เรียก hook ใด ๆ หลังจากนี้ เพื่อเลี่ยง #310
+  if (loading) return <div className="p-6">กำลังโหลด...</div>;
+  if (err) return <div className="p-6 text-red-600">{err}</div>;
+  if (!lot) return <div className="p-6 text-gray-500">ไม่มีข้อมูลล็อต</div>;
 
-  if (loading) return <div className="p-6">กำลังโหลด...</div>
-  if (err) return <div className="p-6 text-red-600">{err}</div>
-  if (!lot) return <div className="p-6 text-gray-500">ไม่มีข้อมูลล็อต</div>
-
-  // คำนวณ src ของรูป QR แบบตัวแปรธรรมดา (ไม่ใช้ useMemo)
-  const BACKEND = API_BASE.replace(/\/$/, '')
+  // คำนวณ src ของรูป QR
+  const BACKEND = API_BASE.replace(/\/$/, '');
   const qrSrc = lot?.lotId
     ? `${BACKEND}/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
-    : ''
+    : '';
 
   return (
     <div className="p-6 space-y-6">
+      {/* หัวเรื่อง + ปุ่มลบ */}
       <div className="flex items-start justify-between">
         <h1 className="text-2xl font-semibold">{lot.lotId}</h1>
         <div className="flex items-center gap-3">
@@ -156,9 +165,7 @@ export default function LotDetails() {
             />
           </div>
 
-          <div className="text-xs text-gray-500 mt-3 break-all">
-            Hash: {lot.hash}
-          </div>
+          <div className="text-xs text-gray-500 mt-3 break-all">Hash: {lot.hash}</div>
         </div>
 
         {/* QR */}
@@ -170,7 +177,7 @@ export default function LotDetails() {
               className="w-48 h-48 object-contain"
               onError={(e) => {
                 e.currentTarget.src =
-                  `${BACKEND}/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`
+                  `${BACKEND}/api/lots/${encodeURIComponent(lot.lotId)}/qr?ts=${Date.now()}`;
               }}
             />
           ) : (
@@ -180,61 +187,54 @@ export default function LotDetails() {
       </div>
 
       {/* ไทม์ไลน์ */}
-<div className="p-4 bg-white rounded-2xl shadow space-y-3">
-  <div className="font-semibold mb-2">ไทม์ไลน์</div>
+      <div className="p-4 bg-white rounded-2xl shadow space-y-3">
+        <div className="font-semibold mb-2">ไทม์ไลน์</div>
 
-  {events.length === 0 && (
-    <div className="text-sm text-gray-400">ยังไม่มีเหตุการณ์</div>
-  )}
+        {events.length === 0 && (
+          <div className="text-sm text-gray-400">ยังไม่มีเหตุการณ์</div>
+        )}
 
- {events.map((ev) => {
-  const timeStr = ev.timestamp
-    ? new Date(ev.timestamp).toLocaleString('th-TH')
-    : '';
+        {events.map((ev) => {
+          const timeStr = ev.timestamp
+            ? new Date(ev.timestamp).toLocaleString('th-TH')
+            : '';
 
-  const hasTemp = typeof ev.temperature === 'number';
-  const hasHum  = typeof ev.humidity === 'number';
-  const envLine =
-    hasTemp || hasHum
-      ? `อุณหภูมิ: ${hasTemp ? ev.temperature : '-'}°C  ·  ความชื้น: ${hasHum ? ev.humidity : '-'}%`
-      : '';
+          const hasTemp = typeof ev.temperature === 'number';
+          const hasHum = typeof ev.humidity === 'number';
+          const envLine =
+            hasTemp || hasHum
+              ? `อุณหภูมิ: ${hasTemp ? ev.temperature : '-'}°C  ·  ความชื้น: ${hasHum ? ev.humidity : '-'}%`
+              : '';
 
-  return (
-    <div key={ev.id} className="p-4 bg-gray-50 rounded-xl">
-      <div className="font-semibold tracking-wide">{ev.type}</div>
+          return (
+            <div key={ev.id} className="p-4 bg-gray-50 rounded-xl">
+              <div className="font-semibold tracking-wide">{ev.type}</div>
 
-      {ev.locationName && (
-        <div className="text-sm text-gray-600">{ev.locationName}</div>
-      )}
+              {ev.locationName && (
+                <div className="text-sm text-gray-600">{ev.locationName}</div>
+              )}
 
-      {(ev.fromName || ev.toName) && (
-        <div className="text-sm text-gray-700 mt-1">
-          เส้นทาง: {ev.fromName || '-'} → {ev.toName || '-'}
-        </div>
-      )}
+              {(ev.fromName || ev.toName) && (
+                <div className="text-sm text-gray-700 mt-1">
+                  เส้นทาง: {ev.fromName || '-'} → {ev.toName || '-'}
+                </div>
+              )}
 
-      {envLine && (
-        <div className="text-sm text-gray-700 mt-1">{envLine}</div>
-      )}
+              {envLine && (
+                <div className="text-sm text-gray-700 mt-1">{envLine}</div>
+              )}
 
-      {ev.note && (
-        <div className="text-sm text-gray-600 mt-1">
-          หมายเหตุ: {ev.note}
-        </div>
-      )}
+              {ev.note && (
+                <div className="text-sm text-gray-600 mt-1">
+                  หมายเหตุ: {ev.note}
+                </div>
+              )}
 
-      <div className="text-xs text-gray-400 mt-1">{timeStr}</div>
-    </div>
-  );
-})}
-
-
-        <div className="text-xs text-gray-400 mt-1">{timeStr}</div>
+              <div className="text-xs text-gray-400 mt-1">{timeStr}</div>
+            </div>
+          );
+        })}
       </div>
-    );
-  })}
-</div>
-
 
       {/* ฟอร์มเพิ่มเหตุการณ์ */}
       {canWrite && (
@@ -246,13 +246,14 @@ export default function LotDetails() {
               <select
                 className="input"
                 value={form.type}
-                onChange={e => setForm({ ...form, type: e.target.value })}
+                onChange={(e) => setForm({ ...form, type: e.target.value })}
               >
+                {/* ใช้เฉพาะค่าที่ backend รองรับใน prisma enum */}
                 <option value="TRANSPORTED">TRANSPORTED</option>
-                <option value="WAREHOUSED">WAREHOUSED</option>
                 <option value="INSPECTED">INSPECTED</option>
-                <option value="PROCESSED">PROCESSED</option>
-                <option value="EXPORTED">EXPORTED</option>
+                <option value="SENSOR_READING">SENSOR_READING</option>
+                <option value="MERGED">MERGED</option>
+                <option value="SOLD">SOLD</option>
               </select>
             </div>
 
@@ -261,7 +262,7 @@ export default function LotDetails() {
               <input
                 className="input"
                 value={form.locationName}
-                onChange={e => setForm({ ...form, locationName: e.target.value })}
+                onChange={(e) => setForm({ ...form, locationName: e.target.value })}
                 placeholder="เช่น คลังสินค้าเชียงใหม่"
               />
             </div>
@@ -271,7 +272,8 @@ export default function LotDetails() {
               <input
                 className="input"
                 value={form.fromName}
-                onChange={e => setForm({ ...form, fromName: e.target.value })}
+                onChange={(e) => setForm({ ...form, fromName: e.target.value })}
+                placeholder="ต้นทาง (เช่น สวน/จังหวัด)"
               />
             </div>
 
@@ -280,7 +282,8 @@ export default function LotDetails() {
               <input
                 className="input"
                 value={form.toName}
-                onChange={e => setForm({ ...form, toName: e.target.value })}
+                onChange={(e) => setForm({ ...form, toName: e.target.value })}
+                placeholder="ปลายทาง (เช่น คลัง/จังหวัด)"
               />
             </div>
 
@@ -290,7 +293,7 @@ export default function LotDetails() {
                 className="input"
                 type="number"
                 value={form.temperature}
-                onChange={e => setForm({ ...form, temperature: e.target.value })}
+                onChange={(e) => setForm({ ...form, temperature: e.target.value })}
               />
             </div>
 
@@ -300,7 +303,7 @@ export default function LotDetails() {
                 className="input"
                 type="number"
                 value={form.humidity}
-                onChange={e => setForm({ ...form, humidity: e.target.value })}
+                onChange={(e) => setForm({ ...form, humidity: e.target.value })}
               />
             </div>
 
@@ -309,7 +312,7 @@ export default function LotDetails() {
               <textarea
                 className="input"
                 value={form.note}
-                onChange={e => setForm({ ...form, note: e.target.value })}
+                onChange={(e) => setForm({ ...form, note: e.target.value })}
               />
             </div>
 
@@ -326,14 +329,5 @@ export default function LotDetails() {
         </div>
       )}
     </div>
-  )
-}
-
-function Info({ label, value, positive }) {
-  return (
-    <div className="p-3 rounded-xl bg-gray-50">
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className={`text-lg ${positive ? 'text-green-600' : ''}`}>{value}</div>
-    </div>
-  )
+  );
 }
