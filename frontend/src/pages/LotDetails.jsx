@@ -179,26 +179,52 @@ export default function LotDetails() {
         </div>
       </div>
 
-      {/* Timeline */}
-      <div className="p-4 bg-white rounded-2xl shadow">
-        <h2 className="font-semibold mb-3">ไทม์ไลน์</h2>
-        {events.length === 0 ? (
-          <div className="text-sm text-gray-500">ยังไม่มีเหตุการณ์</div>
-        ) : (
-          <ul className="space-y-3">
-            {events.map((e) => (
-              <li key={e.id} className="p-3 rounded-xl bg-gray-50">
-                <div className="text-sm font-mono">{e.type}</div>
-                <div className="text-sm text-gray-600">{e.locationName}</div>
-                {e.note && <div className="text-sm text-gray-500">หมายเหตุ: {e.note}</div>}
-                <div className="text-xs text-gray-400">
-                  {new Date(e.timestamp || e.createdAt).toLocaleString('th-TH')}
-                </div>
-              </li>
-            ))}
-          </ul>
+      {/* ไทม์ไลน์ */}
+<div className="p-4 bg-white rounded-2xl shadow space-y-3">
+  <div className="font-semibold mb-2">ไทม์ไลน์</div>
+
+  {events.length === 0 && (
+    <div className="text-sm text-gray-400">ยังไม่มีเหตุการณ์</div>
+  )}
+
+  {events.map((ev) => {
+    const timeStr = ev.timestamp
+      ? new Date(ev.timestamp).toLocaleString('th-TH')
+      : '';
+
+    // เตรียมข้อความอุณหภูมิ/ความชื้น (แสดงเฉพาะเมื่อมีค่า)
+    const hasTemp = typeof ev.temperature === 'number';
+    const hasHum  = typeof ev.humidity === 'number';
+    const envLine =
+      hasTemp || hasHum
+        ? `อุณหภูมิ: ${hasTemp ? ev.temperature : '-'}°C  ·  ความชื้น: ${hasHum ? ev.humidity : '-'}%`
+        : '';
+
+    return (
+      <div key={ev.id} className="p-4 bg-gray-50 rounded-xl">
+        <div className="font-semibold tracking-wide">{ev.type}</div>
+
+        {ev.locationName && (
+          <div className="text-sm text-gray-600">{ev.locationName}</div>
         )}
+
+        {/* แสดงอุณหภูมิ/ความชื้น ถ้ามี */}
+        {envLine && (
+          <div className="text-sm text-gray-700 mt-1">{envLine}</div>
+        )}
+
+        {ev.note && (
+          <div className="text-sm text-gray-600 mt-1">
+            หมายเหตุ: {ev.note}
+          </div>
+        )}
+
+        <div className="text-xs text-gray-400 mt-1">{timeStr}</div>
       </div>
+    );
+  })}
+</div>
+
 
       {/* ฟอร์มเพิ่มเหตุการณ์ */}
       {canWrite && (
