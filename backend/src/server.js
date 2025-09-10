@@ -76,21 +76,18 @@ app.post("/api/auth/register", async (req, res) => {
     if (!email || !password || !name)
       return res.status(400).json({ error: "missing fields" });
 
-+   const exists = await prisma.user.findUnique({ where: { email } });
-+   if (exists) return res.status(409).json({ error: "email already registered" });
+   const exists = await prisma.user.findUnique({ where: { email } });
+   if (exists) return res.status(409).json({ error: "email already registered" });
 
     const hash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
--     data: { email, password: hash, name, role: role || "FARMER" },
-+     data: { email, passwordHash: hash, name, role: role || "FARMER" },
-+     select: { id: true, email: true, name: true, role: true }
+     data: { email, passwordHash: hash, name, role: role || "FARMER" },
+     select: { id: true, email: true, name: true, role: true }
     });
--   const token = signToken(user);
-+   const token = signToken(user);
+   const token = signToken(user);
     res.json({
       token,
--     user: { id: user.id, email: user.email, name: user.name, role: user.role },
-+     user
+     user
     });
   } catch (e) {
     console.error(e);
@@ -102,8 +99,7 @@ app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) return res.status(401).json({ error: "invalid credentials" });
-- const ok = await bcrypt.compare(password, user.password);
-+ const ok = await bcrypt.compare(password, user.passwordHash);
+ const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return res.status(401).json({ error: "invalid credentials" });
   const token = signToken(user);
   res.json({
