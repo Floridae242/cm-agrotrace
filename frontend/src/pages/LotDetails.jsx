@@ -187,37 +187,47 @@ export default function LotDetails() {
     <div className="text-sm text-gray-400">ยังไม่มีเหตุการณ์</div>
   )}
 
-  {events.map((ev) => {
-    const timeStr = ev.timestamp
-      ? new Date(ev.timestamp).toLocaleString('th-TH')
+ {events.map((ev) => {
+  const timeStr = ev.timestamp
+    ? new Date(ev.timestamp).toLocaleString('th-TH')
+    : '';
+
+  const hasTemp = typeof ev.temperature === 'number';
+  const hasHum  = typeof ev.humidity === 'number';
+  const envLine =
+    hasTemp || hasHum
+      ? `อุณหภูมิ: ${hasTemp ? ev.temperature : '-'}°C  ·  ความชื้น: ${hasHum ? ev.humidity : '-'}%`
       : '';
 
-    // เตรียมข้อความอุณหภูมิ/ความชื้น (แสดงเฉพาะเมื่อมีค่า)
-    const hasTemp = typeof ev.temperature === 'number';
-    const hasHum  = typeof ev.humidity === 'number';
-    const envLine =
-      hasTemp || hasHum
-        ? `อุณหภูมิ: ${hasTemp ? ev.temperature : '-'}°C  ·  ความชื้น: ${hasHum ? ev.humidity : '-'}%`
-        : '';
+  return (
+    <div key={ev.id} className="p-4 bg-gray-50 rounded-xl">
+      <div className="font-semibold tracking-wide">{ev.type}</div>
 
-    return (
-      <div key={ev.id} className="p-4 bg-gray-50 rounded-xl">
-        <div className="font-semibold tracking-wide">{ev.type}</div>
+      {ev.locationName && (
+        <div className="text-sm text-gray-600">{ev.locationName}</div>
+      )}
 
-        {ev.locationName && (
-          <div className="text-sm text-gray-600">{ev.locationName}</div>
-        )}
+      {(ev.fromName || ev.toName) && (
+        <div className="text-sm text-gray-700 mt-1">
+          เส้นทาง: {ev.fromName || '-'} → {ev.toName || '-'}
+        </div>
+      )}
 
-        {/* แสดงอุณหภูมิ/ความชื้น ถ้ามี */}
-        {envLine && (
-          <div className="text-sm text-gray-700 mt-1">{envLine}</div>
-        )}
+      {envLine && (
+        <div className="text-sm text-gray-700 mt-1">{envLine}</div>
+      )}
 
-        {ev.note && (
-          <div className="text-sm text-gray-600 mt-1">
-            หมายเหตุ: {ev.note}
-          </div>
-        )}
+      {ev.note && (
+        <div className="text-sm text-gray-600 mt-1">
+          หมายเหตุ: {ev.note}
+        </div>
+      )}
+
+      <div className="text-xs text-gray-400 mt-1">{timeStr}</div>
+    </div>
+  );
+})}
+
 
         <div className="text-xs text-gray-400 mt-1">{timeStr}</div>
       </div>
