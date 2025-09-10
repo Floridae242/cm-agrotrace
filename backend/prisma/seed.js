@@ -1,7 +1,7 @@
+// prisma/seed.js
 import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
-// แก้จุดพัง: import ตรงจาก node:crypto (ESM friendly)
 import crypto from "node:crypto";
 
 dotenv.config();
@@ -20,7 +20,7 @@ function computeLotHash(l) {
     brix: l.brix ?? null,
     moisture: l.moisture ?? null,
     pesticidePass: l.pesticidePass ?? null,
-    ownerId: l.ownerId
+    ownerId: l.ownerId,
   };
   const json = JSON.stringify(obj, Object.keys(obj).sort());
   return crypto.createHash("sha256").update(json).digest("hex");
@@ -34,10 +34,10 @@ async function main() {
     update: {},
     create: {
       email: "farmer@example.com",
-      password: pass,
+      passwordHash: pass, // ✅ ใช้ passwordHash ให้ตรง schema.prisma
       name: "คุณชาวสวน",
-      role: "FARMER"
-    }
+      role: "FARMER",
+    },
   });
 
   // Demo longan lot
@@ -65,8 +65,8 @@ async function main() {
       pesticidePass: true,
       notes: "ล็อตทดสอบสำหรับ CM-AgroTrace",
       ownerId: farmer.id,
-      hash: "TEMP"
-    }
+      hash: "TEMP",
+    },
   });
 
   // update hash หลังสร้าง
@@ -81,8 +81,8 @@ async function main() {
         lotId: lot.id,
         type: "HARVEST_CREATED",
         locationName: "ฝาง, เชียงใหม่",
-        note: "เริ่มล็อตลำไยตัวอย่าง"
-      }
+        note: "เริ่มล็อตลำไยตัวอย่าง",
+      },
     });
   }
 
@@ -90,8 +90,10 @@ async function main() {
 }
 
 main()
-  .then(() => process.exit(0))
   .catch((e) => {
     console.error(e);
     process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect(); // ✅ ปิด connection ให้เรียบร้อย
   });
