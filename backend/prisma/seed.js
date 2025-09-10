@@ -1,4 +1,3 @@
-// prisma/seed.js
 import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
@@ -27,27 +26,23 @@ function computeLotHash(l) {
 }
 
 async function main() {
-  // Users
+  // user demo
   const pass = await bcrypt.hash("test1234", 10);
   const farmer = await prisma.user.upsert({
     where: { email: "farmer@example.com" },
     update: {},
     create: {
       email: "farmer@example.com",
-      passwordHash: pass, // ✅ ใช้ passwordHash ให้ตรง schema.prisma
+      passwordHash: pass,
       name: "คุณชาวสวน",
       role: "FARMER",
     },
   });
 
-  // Demo longan lot
+  // lot demo
   const now = new Date();
   const lotId =
-    "LOT-" +
-    now.getFullYear() +
-    "-" +
-    (now.getMonth() + 1).toString().padStart(2, "0") +
-    "-LONGAN-DEMO";
+    "LOT-" + now.getFullYear() + "-" + (now.getMonth() + 1).toString().padStart(2, "0") + "-LONGAN-DEMO";
 
   const lot = await prisma.lot.upsert({
     where: { lotId },
@@ -69,13 +64,13 @@ async function main() {
     },
   });
 
-  // update hash หลังสร้าง
+  // อัปเดต hash
   const hash = computeLotHash(lot);
   await prisma.lot.update({ where: { id: lot.id }, data: { hash } });
 
-  // Event seed: สร้างเฉพาะถ้ายังไม่มี event ใด ๆ ของ lot นี้
-  const existingEventCount = await prisma.event.count({ where: { lotId: lot.id } });
-  if (existingEventCount === 0) {
+  // event แรก (ถ้ายังไม่มี)
+  const count = await prisma.event.count({ where: { lotId: lot.id } });
+  if (count === 0) {
     await prisma.event.create({
       data: {
         lotId: lot.id,
@@ -95,5 +90,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect(); // ✅ ปิด connection ให้เรียบร้อย
+    await prisma.$disconnect();
   });
