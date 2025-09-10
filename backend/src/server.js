@@ -9,7 +9,6 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import QRCode from "qrcode";
 import { PrismaClient } from "@prisma/client";
-import express from "express";
 import { register } from "./controllers/auth.controller.js";
 
 dotenv.config();
